@@ -371,10 +371,10 @@
 const STOPS = [
   {
     name: "Kölner Dom",
-    lat: 50.936506, 
+   lat: 50.936506, 
     lng: 6.940034,
     radius: 40,
-    audioSrc: "audio/stop01.mp3",
+    audioSrc: "audio/stop1.mp3",
     message: "You made it to the cathedral. Look up at the north tower — count the gargoyles and text me the number."
   },
   {
@@ -404,7 +404,7 @@ const STOPS = [
 ];
 /* ============================================================ */
 
-const APP_VERSION = "1.1.0";
+const APP_VERSION = "1.2.0";
 
 let current = 0;
 let rawPos = null;       // {lat, lng} straight from the GPS
@@ -633,20 +633,55 @@ function startGeolocation(){
 
 // ---- device orientation / compass ----
 // Raw deviceorientation events can fire up to 60x/second and jitter by
-// several degrees each reading — that's what caused the flicker. We record
-// the latest raw reading here, and a separate throttled loop (below) smooths
-// it before it ever touches the needle.
+// several degrees each reading. Two extra problems beyond plain noise:
+//
+// 1. Plain alpha-based heading ("360 - alpha") is only correct when the
+//    phone is held flat, like a tabletop compass. Held up while walking
+//    (tilted), that math becomes unstable — this is the main cause of big
+//    swings. computeTiltCompensatedHeading() below corrects for the
+//    phone's actual tilt (beta/gamma) using its full orientation, not
+//    just alpha.
+// 2. Some Android phones fire BOTH 'deviceorientation' and
+//    'deviceorientationabsolute' with different reference frames (one
+//    relative to where the page loaded, one relative to true/magnetic
+//    north) — mixing them makes the needle fight itself. Once we get a
+//    high-quality (absolute or iOS) reading we lock onto that source and
+//    ignore lower-quality ones.
+function computeTiltCompensatedHeading(alpha, beta, gamma){
+  const aRad = toRad(alpha), bRad = toRad(beta), gRad = toRad(gamma);
+  const cA = Math.cos(aRad), sA = Math.sin(aRad);
+  const cB = Math.cos(bRad), sB = Math.sin(bRad);
+  const cG = Math.cos(gRad), sG = Math.sin(gRad);
+
+  const rA = -cA * sG - sA * sB * cG;
+  const rB = -sA * sG + cA * sB * cG;
+
+  let h = toDeg(Math.atan2(rA, rB));
+  if(h < 0) h += 360;
+  return h;
+}
+
+let headingQuality = null; // null | 'low' | 'high' — once 'high' is seen, 'low' readings are ignored
+
 function attachOrientation(){
   if(orientationHandlerAttached) return;
   orientationHandlerAttached = true;
   function handler(e){
-    let h = null;
+    let h = null, quality = null;
     if(typeof e.webkitCompassHeading === 'number'){
-      h = e.webkitCompassHeading; // iOS: already true/magnetic heading
+      h = e.webkitCompassHeading; // iOS: tilt-compensated by the OS already
+      quality = 'high';
+    } else if(e.alpha !== null && e.beta !== null && e.gamma !== null){
+      h = computeTiltCompensatedHeading(e.alpha, e.beta, e.gamma);
+      quality = (e.absolute === true) ? 'high' : 'low';
     } else if(e.alpha !== null){
-      h = 360 - e.alpha; // best effort on Android, with or without 'absolute'
+      h = 360 - e.alpha; // no tilt data at all — crude last-resort fallback
+      quality = 'low';
     }
-    if(h !== null){ rawHeading = (h+360)%360; }
+    if(h === null) return;
+    if(quality === 'low' && headingQuality === 'high') return; // don't let a worse source fight a better one
+    if(quality === 'high') headingQuality = 'high';
+    rawHeading = (h + 360) % 360;
   }
   window.addEventListener('deviceorientationabsolute', handler, true);
   window.addEventListener('deviceorientation', handler, true);
@@ -654,15 +689,32 @@ function attachOrientation(){
 
 // Smooths heading at a fixed ~12Hz rate regardless of how fast the sensor
 // fires, using a circular exponential moving average so it settles instead
-// of snapping to every noisy reading.
+// of snapping to every noisy reading. Sudden large jumps (>90°) are treated
+// as likely sensor glitches and only accepted once the next reading
+// confirms them, rather than immediately swinging the needle.
+let pendingOutlier = null;
 function startSmoothingLoop(){
   if(smoothLoopStarted) return;
   smoothLoopStarted = true;
   setInterval(()=>{
-    if(rawHeading !== null){
-      heading = heading === null ? rawHeading : smoothAngle(heading, rawHeading, 0.15);
-      updateDial();
+    if(rawHeading === null) return;
+    if(heading === null){
+      heading = rawHeading;
+    } else {
+      const jump = Math.abs(angleDiff(heading, rawHeading));
+      if(jump > 90){
+        if(pendingOutlier !== null && Math.abs(angleDiff(pendingOutlier, rawHeading)) < 20){
+          heading = smoothAngle(heading, rawHeading, 0.3); // confirmed real change — catch up faster
+          pendingOutlier = null;
+        } else {
+          pendingOutlier = rawHeading; // wait for confirmation before trusting a big jump
+        }
+      } else {
+        heading = smoothAngle(heading, rawHeading, 0.15);
+        pendingOutlier = null;
+      }
     }
+    updateDial();
   }, 80);
 }
 

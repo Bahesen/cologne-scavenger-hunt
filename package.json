@@ -1,6 +1,6 @@
 {
   "name": "cologne-scavenger-hunt",
-  "version": "1.1.1",
+  "version": "1.0.0",
   "description": "GPS compass scavenger hunt through Cologne with location-triggered voice messages.",
   "private": true,
   "scripts": {
