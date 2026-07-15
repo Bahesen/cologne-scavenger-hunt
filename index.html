@@ -158,11 +158,12 @@
     display:block;
   }
   .arrival-letter{
-    margin-top:auto;
-    padding-top:24px;
+    flex:1;
     flex-direction:column;
     align-items:center;
-    gap:14px;
+    justify-content:center;
+    gap:18px;
+    padding:20px 0;
   }
 
   /* ---- status bar ---- */
@@ -309,10 +310,14 @@
 
   /* ---- arrival panel ---- */
   .arrival{
-    margin-top:auto;
+    flex:1;
+    min-height:0;
     padding-top:22px;
     border-top:2px dashed rgba(122,46,46,0.4);
     display:none;
+    flex-direction:column;
+    justify-content:center;
+    gap:8px;
     animation: unfurl 0.5s ease-out;
     transform-origin: top center;
   }
@@ -320,7 +325,7 @@
     from{ transform: scaleY(0.75); opacity:0; }
     to{ transform: scaleY(1); opacity:1; }
   }
-  .arrival.show{display:block;}
+  .arrival.show{display:flex;}
   .arrival .tag{
     display:flex;
     align-items:center;
@@ -482,6 +487,11 @@
     <p class="intro-hint">Tippe auf die Flasche</p>
   </div>
 
+  <div class="intro" id="resumeScreen" style="display:none;">
+    <p class="intro-hint">Deine Reise ist noch nicht zu Ende.</p>
+    <button class="primary" id="resumeBtn" style="width:auto; padding:15px 28px;">Reise fortsetzen</button>
+  </div>
+
   <!-- EDIT THIS: the letter text shown after the bottle is opened -->
   <div class="letter-screen" id="letterScreen" style="display:none;">
     <div class="letter-text">
@@ -576,17 +586,17 @@ Bei einem Spiel aus Schlag und Ball und Loch, lernte ich die hiesigen Gebräuche
         </div>
       </div>
     </div>
-    <button class="primary" id="nextBtn">Auf zum nächsten Ziel</button>
+    <button class="primary" id="nextBtn">Weiter</button>
     <div class="error-msg" id="playErrBox" style="display:none;"></div>
   </div>
 
   <div class="done" id="doneScreen" style="display:none;">
-    <h1>Die heutige Reise endet hier.</h1>
+    <h1>Voyage complete</h1>
     <svg class="flourish" viewBox="0 0 120 16" fill="none">
       <path d="M0 8 Q20 0 40 8 T80 8 T120 8" stroke="#6b5738" stroke-width="1"/>
       <circle cx="60" cy="8" r="3" fill="#B8860B"/>
     </svg>
-    <p>Ich danke euch, meine treuen Freundinnen und Freunde.</p>
+    <p>Every stop found. Well sailed.</p>
   </div>
 
   <details class="testdrawer">
@@ -609,6 +619,11 @@ Bei einem Spiel aus Schlag und Ball und Loch, lernte ich die hiesigen Gebräuche
     </div>
     <button class="ghost" id="simApply">Apply simulated position</button>
     <button class="ghost" id="simToggle">Enable test mode</button>
+    <div class="row row2">
+      <button class="ghost" id="prevStopBtn" style="flex:1;">◀ Previous Location</button>
+      <button class="ghost" id="nextStopBtn" style="flex:1;">Next Location ▶</button>
+    </div>
+    <button class="ghost" id="resetJourneyBtn" style="margin-top:10px; border-color:var(--danger); color:var(--danger);">Reset Journey</button>
   </details>
 
 </div>
@@ -661,7 +676,7 @@ const STOPS = [
 ];
 /* ============================================================ */
 
-const APP_VERSION = "1.8.0";
+const APP_VERSION = "1.10.0";
 
 let current = 0;
 let rawPos = null;       // {lat, lng} straight from the GPS
@@ -677,6 +692,8 @@ let smoothLoopStarted = false;
 
 const el = id => document.getElementById(id);
 const introScreen = el('introScreen');
+const resumeScreen = el('resumeScreen');
+const resumeBtn = el('resumeBtn');
 const bottleBtn = el('bottleBtn');
 const letterScreen = el('letterScreen');
 const introPlayBtn = el('introPlayBtn');
@@ -781,10 +798,29 @@ function bearingDeg(lat1,lon1,lat2,lon2){
   return (toDeg(Math.atan2(y,x))+360)%360;
 }
 
+// ---- saving progress so a crash/reload doesn't lose the journey ----
+const PROGRESS_KEY = 'hieronymus_progress_v1';
+function saveProgress(){
+  try{ localStorage.setItem(PROGRESS_KEY, JSON.stringify({current})); }catch(e){}
+}
+function clearProgress(){
+  try{ localStorage.removeItem(PROGRESS_KEY); }catch(e){}
+}
+function loadSavedProgress(){
+  try{
+    const raw = localStorage.getItem(PROGRESS_KEY);
+    if(!raw) return null;
+    const data = JSON.parse(raw);
+    if(typeof data.current === 'number' && data.current >= 0 && data.current < STOPS.length) return data;
+  }catch(e){}
+  return null;
+}
+
 function loadStop(i){
   arrived = false;
   arrivalPanel.classList.remove('show');
   arrivalLetterPrompt.style.display = 'none';
+  document.querySelector('.status').style.display = '';
   reopenLetterBtn.style.display = '';
   doneScreen.style.display = 'none';
   dialWrap.style.display = '';
@@ -793,12 +829,14 @@ function loadStop(i){
   const s = STOPS[i];
   stopNameEl.textContent = s.name;
   stopCountEl.textContent = `${i+1} / ${STOPS.length}`;
-  hintOut.textContent = 'walk toward the arrow';
+  hintOut.textContent = 'Folge mir.';
+  saveProgress();
 }
 
 function finishTrail(){
   dialWrap.style.display = 'none';
   document.querySelector('.readout').style.display='none';
+  document.querySelector('.status').style.display = '';
   reopenLetterBtn.style.display = 'none';
   arrivalLetterPrompt.style.display = 'none';
   arrivalPanel.classList.remove('show');
@@ -806,6 +844,7 @@ function finishTrail(){
   stopNameEl.textContent = "—";
   stopCountEl.textContent = `${STOPS.length} / ${STOPS.length}`;
   if(watchId!==null) navigator.geolocation.clearWatch(watchId);
+  clearProgress();
 }
 
 function updateDial(){
@@ -842,6 +881,9 @@ function playSuccessSound(){
 
 function triggerArrival(){
   arrived = true;
+  document.querySelector('.status').style.display = 'none';
+  dialWrap.style.display = 'none';
+  document.querySelector('.readout').style.display = 'none';
   reopenLetterBtn.style.display = 'none';
   arrivalLetterPrompt.style.display = 'flex';
   if(navigator.vibrate) navigator.vibrate([80,40,80]);
@@ -1130,6 +1172,11 @@ bottleBtn.addEventListener('click', ()=>{
   try{ setupIntroAudio(); }catch(e){} // missing/blocked intro.mp3 shouldn't stop the letter from showing
 });
 
+resumeBtn.addEventListener('click', ()=>{
+  resumeScreen.style.display = 'none';
+  requestPermissionsAndStart();
+});
+
 beginBtn.addEventListener('click', ()=>{
   if(introAudioEl){ introAudioEl.pause(); }
   playSuccessSound();
@@ -1182,6 +1229,36 @@ el('simApply').addEventListener('click', ()=>{
   if(!isNaN(hd)){ rawHeading = ((hd%360)+360)%360; }
   updateDial();
 });
+
+// ---- skip between stops (testing / manual override) ----
+function goToStop(delta){
+  const next = Math.min(STOPS.length - 1, Math.max(0, current + delta));
+  if(next === current) return;
+  current = next;
+  loadStop(current);
+  if(userPos) updateDial();
+}
+el('prevStopBtn').addEventListener('click', ()=>goToStop(-1));
+el('nextStopBtn').addEventListener('click', ()=>goToStop(1));
+
+// ---- reset journey ----
+// Reloading after clearing storage is the simplest reliable way to reset
+// everything at once (geolocation watch, sensor listeners, screen states)
+// rather than trying to manually rewind every piece of state in place.
+el('resetJourneyBtn').addEventListener('click', ()=>{
+  clearProgress();
+  location.reload();
+});
+
+// ---- resume a saved journey on page load ----
+(function checkSavedProgress(){
+  const saved = loadSavedProgress();
+  if(saved){
+    current = saved.current;
+    introScreen.style.display = 'none';
+    resumeScreen.style.display = '';
+  }
+})();
 </script>
 </body>
 </html>
