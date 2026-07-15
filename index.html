@@ -86,7 +86,7 @@
     inset:0;
     width:100%;
     height:100%;
-    transition: transform 0.25s ease-out;
+    transition: transform 0.18s linear;
     will-change: transform;
   }
   .needle svg{width:100%;height:100%;display:block;}
@@ -280,7 +280,7 @@
 
   <div class="status">
     <div>
-      <div class="eyebrow">Cologne Field Trail</div>
+      <div class="eyebrow">Cologne Field Trail <span id="versionTag" style="color:var(--paper-dim); font-weight:400; letter-spacing:0.05em;"></span></div>
       <div class="stopname" id="stopName">—</div>
     </div>
     <div class="count" id="stopCount">0 / 0</div>
@@ -324,6 +324,7 @@
       <div class="play-track"><div class="fill" id="playFill"></div></div>
     </div>
     <button class="primary" id="nextBtn">Continue to next stop</button>
+    <div class="error-msg" id="playErrBox" style="display:none;"></div>
   </div>
 
   <div class="done" id="doneScreen" style="display:none;">
@@ -369,12 +370,12 @@
    ============================================================ */
 const STOPS = [
   {
-    name: "Hahnentor",
-    lat: 50.936506,
-    lng:  6.940034,
-    radius: 50,
+    name: "Kölner Dom",
+    lat: 50.936506, 
+    lng: 6.940034,
+    radius: 40,
     audioSrc: "audio/stop1.mp3",
-    message: "Das tolle Hahnentor. Finde heraus wie alt es ist und tippe die richtige Zahl ein."
+    message: "You made it to the cathedral. Look up at the north tower — count the gargoyles and text me the number."
   },
   {
     name: "Hohenzollernbrücke",
@@ -403,13 +404,19 @@ const STOPS = [
 ];
 /* ============================================================ */
 
+const APP_VERSION = "1.1.0";
+
 let current = 0;
-let userPos = null;      // {lat, lng}
-let heading = null;      // degrees, 0 = north
+let rawPos = null;       // {lat, lng} straight from the GPS
+let userPos = null;      // {lat, lng} smoothed — this is what the app uses
+let rawHeading = null;   // degrees, straight from the sensor
+let heading = null;      // degrees, smoothed — this is what the app uses
+let needleRotation = 0;  // unwrapped (can exceed 0–360) so the needle never spins backward
 let watchId = null;
 let arrived = false;
 let testMode = false;
 let orientationHandlerAttached = false;
+let smoothLoopStarted = false;
 
 const el = id => document.getElementById(id);
 const stopNameEl = el('stopName');
@@ -420,6 +427,7 @@ const needle = el('needle');
 const gate = el('gate');
 const startBtn = el('startBtn');
 const errBox = el('errBox');
+const playErrBox = el('playErrBox');
 const arrivalPanel = el('arrivalPanel');
 const arrivalMsg = el('arrivalMsg');
 const nextBtn = el('nextBtn');
@@ -427,6 +435,8 @@ const playBtn = el('playBtn');
 const playFill = el('playFill');
 const doneScreen = el('doneScreen');
 const dialWrap = el('dialWrap');
+
+el('versionTag').textContent = `· v${APP_VERSION}`;
 
 // draw 24 tick marks
 (function drawTicks(){
@@ -447,6 +457,18 @@ const dialWrap = el('dialWrap');
 
 function toRad(d){return d*Math.PI/180;}
 function toDeg(r){return r*180/Math.PI;}
+
+// shortest signed difference target-from in (-180, 180]
+function angleDiff(from, target){
+  let d = (target - from) % 360;
+  if(d > 180) d -= 360;
+  if(d < -180) d += 360;
+  return d;
+}
+// move `current` a fraction `alpha` of the way toward `target`, going the short way around the circle
+function smoothAngle(current, target, alpha){
+  return (current + angleDiff(current, target) * alpha + 360) % 360;
+}
 
 function haversineMeters(lat1,lon1,lat2,lon2){
   const R = 6371000;
@@ -469,6 +491,7 @@ function loadStop(i){
   doneScreen.style.display = 'none';
   dialWrap.style.display = '';
   document.querySelector('.readout').style.display='';
+  playErrBox.style.display = 'none';
   const s = STOPS[i];
   stopNameEl.textContent = s.name;
   stopCountEl.textContent = `${i+1} / ${STOPS.length}`;
@@ -495,8 +518,11 @@ function updateDial(){
 
   if(heading!==null){
     const brg = bearingDeg(userPos.lat, userPos.lng, target.lat, target.lng);
-    const rot = (brg - heading + 360) % 360;
-    needle.style.transform = `rotate(${rot}deg)`;
+    const targetRotation = (brg - heading + 360) % 360;
+    // advance the unwrapped rotation by the shortest path, so the needle
+    // never spins the "long way" around when crossing the 0/360 seam
+    needleRotation += angleDiff(needleRotation % 360, targetRotation);
+    needle.style.transform = `rotate(${needleRotation}deg)`;
     hintOut.textContent = dist <= target.radius ? '' : 'walk toward the arrow';
   } else {
     hintOut.textContent = 'point your phone flat to calibrate compass';
@@ -520,29 +546,48 @@ function triggerArrival(){
 // ---- audio playback with speech-synthesis fallback ----
 let audioEl = null;
 let speaking = false;
+let fallbackHandled = false; // guards against onerror AND play().catch both firing for the same failure
 
 playBtn.addEventListener('click', ()=>{
   const s = STOPS[current];
   if(speaking){ window.speechSynthesis.cancel(); speaking=false; playBtn.textContent='▶'; return; }
   if(audioEl && !audioEl.paused){ audioEl.pause(); playBtn.textContent='▶'; return; }
 
+  playErrBox.style.display = 'none';
   if(s.audioSrc){
-    audioEl = new Audio(s.audioSrc);
-    audioEl.ontimeupdate = ()=>{
-      playFill.style.width = `${(audioEl.currentTime/audioEl.duration)*100}%`;
-    };
-    audioEl.onended = ()=>{ playBtn.textContent='▶'; playFill.style.width='100%'; };
-    audioEl.onerror = ()=>{ speakFallback(s.message); };
-    audioEl.play().then(()=>{ playBtn.textContent='❚❚'; }).catch(()=> speakFallback(s.message));
+    playAudioFile(s);
   } else {
     speakFallback(s.message);
   }
 });
 
+function playAudioFile(s){
+  fallbackHandled = false;
+  audioEl = new Audio(s.audioSrc);
+  audioEl.preload = 'auto';
+  audioEl.ontimeupdate = ()=>{
+    if(audioEl.duration) playFill.style.width = `${(audioEl.currentTime/audioEl.duration)*100}%`;
+  };
+  audioEl.onended = ()=>{ playBtn.textContent='▶'; playFill.style.width='100%'; };
+  audioEl.onerror = ()=>{ handleAudioFailure(s); };
+  const playPromise = audioEl.play();
+  if(playPromise && typeof playPromise.then === 'function'){
+    playPromise.then(()=>{ playBtn.textContent='❚❚'; }).catch(()=>{ handleAudioFailure(s); });
+  }
+}
+
+function handleAudioFailure(s){
+  if(fallbackHandled) return; // onerror and the play() rejection can both fire for the same failure — only act once
+  fallbackHandled = true;
+  playErrBox.style.display = 'block';
+  playErrBox.textContent = `Couldn't load "${s.audioSrc}". Check it's deployed at that exact path (filenames are case-sensitive once hosted — "Stop1.mp3" ≠ "stop1.mp3") and that you redeployed after adding it. Reading the message aloud instead.`;
+  speakFallback(s.message);
+}
+
 function speakFallback(text){
   if(!('speechSynthesis' in window)){
-    errBox.style.display='block';
-   // errBox.textContent = 'No audio file found and this browser can\\'t read text aloud. The message is shown above.';
+    playErrBox.style.display='block';
+    playErrBox.textContent = "No audio file found and this browser can't read text aloud. The message is shown above.";
     return;
   }
   speaking = true;
@@ -568,7 +613,18 @@ function startGeolocation(){
     return;
   }
   watchId = navigator.geolocation.watchPosition(pos=>{
-    userPos = {lat: pos.coords.latitude, lng: pos.coords.longitude};
+    rawPos = {lat: pos.coords.latitude, lng: pos.coords.longitude};
+    if(userPos === null){
+      userPos = {...rawPos};
+    } else {
+      // light exponential smoothing — GPS jitter of a few meters causes big
+      // bearing swings when close to a target, this settles it down
+      const posAlpha = 0.35;
+      userPos = {
+        lat: userPos.lat + (rawPos.lat - userPos.lat) * posAlpha,
+        lng: userPos.lng + (rawPos.lng - userPos.lng) * posAlpha
+      };
+    }
     updateDial();
   }, err=>{
     showError('Location access failed: ' + err.message + '. Check that location is allowed for this page in your browser settings.');
@@ -576,6 +632,10 @@ function startGeolocation(){
 }
 
 // ---- device orientation / compass ----
+// Raw deviceorientation events can fire up to 60x/second and jitter by
+// several degrees each reading — that's what caused the flicker. We record
+// the latest raw reading here, and a separate throttled loop (below) smooths
+// it before it ever touches the needle.
 function attachOrientation(){
   if(orientationHandlerAttached) return;
   orientationHandlerAttached = true;
@@ -583,15 +643,27 @@ function attachOrientation(){
     let h = null;
     if(typeof e.webkitCompassHeading === 'number'){
       h = e.webkitCompassHeading; // iOS: already true/magnetic heading
-    } else if(e.alpha !== null && e.absolute){
-      h = 360 - e.alpha;
     } else if(e.alpha !== null){
-      h = 360 - e.alpha; // best effort on Android without 'absolute'
+      h = 360 - e.alpha; // best effort on Android, with or without 'absolute'
     }
-    if(h !== null){ heading = (h+360)%360; updateDial(); }
+    if(h !== null){ rawHeading = (h+360)%360; }
   }
   window.addEventListener('deviceorientationabsolute', handler, true);
   window.addEventListener('deviceorientation', handler, true);
+}
+
+// Smooths heading at a fixed ~12Hz rate regardless of how fast the sensor
+// fires, using a circular exponential moving average so it settles instead
+// of snapping to every noisy reading.
+function startSmoothingLoop(){
+  if(smoothLoopStarted) return;
+  smoothLoopStarted = true;
+  setInterval(()=>{
+    if(rawHeading !== null){
+      heading = heading === null ? rawHeading : smoothAngle(heading, rawHeading, 0.15);
+      updateDial();
+    }
+  }, 80);
 }
 
 function showError(msg){
@@ -613,6 +685,7 @@ async function requestPermissionsAndStart(){
     showError('Could not request compass permission: ' + e.message);
   }
   attachOrientation();
+  startSmoothingLoop();
   startGeolocation();
   gate.style.display = 'none';
   loadStop(current);
@@ -626,6 +699,7 @@ el('simToggle').addEventListener('click', ()=>{
   el('simToggle').textContent = testMode ? 'Disable test mode' : 'Enable test mode';
   if(testMode){
     gate.style.display = 'none';
+    startSmoothingLoop();
     loadStop(current);
   }
 });
@@ -633,8 +707,8 @@ el('simApply').addEventListener('click', ()=>{
   const lat = parseFloat(el('simLat').value);
   const lng = parseFloat(el('simLng').value);
   const hd = parseFloat(el('simHeading').value);
-  if(!isNaN(lat) && !isNaN(lng)){ userPos = {lat, lng}; }
-  if(!isNaN(hd)){ heading = ((hd%360)+360)%360; }
+  if(!isNaN(lat) && !isNaN(lng)){ rawPos = {lat, lng}; userPos = {lat, lng}; }
+  if(!isNaN(hd)){ rawHeading = ((hd%360)+360)%360; }
   updateDial();
 });
 </script>
