@@ -3,20 +3,26 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Cologne Field Trail</title>
+<title>HIERONYMUS TAGEBUCH</title>
 <style>
   :root{
-    --ink:#101528;
-    --ink-2:#161c33;
-    --paper:#EDEAE2;
-    --paper-dim:#b9b6ac;
-    --brass:#D6A34A;
-    --brass-dim:#8a6f37;
-    --teal:#5C7285;
-    --ok:#7FA37F;
-    --danger:#c96a4e;
+    --wood-dark:#160f09;
+    --wood-mid:#2b1d12;
+    --wood-light:#3a2818;
+    --parchment:#E4D3A0;
+    --parchment-light:#EFE0B3;
+    --parchment-shadow:#C7AD72;
+    --ink:#2E1D0E;
+    --ink-2:#4a3520;
+    --ink-faded:#6b5738;
+    --gold:#B8860B;
+    --gold-bright:#D4A62A;
+    --wax:#7A2E2E;
+    --wax-dark:#5C1F1F;
+    --verdigris:#3F6B5C;
+    --danger:#8B3A2E;
     --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --serif: Georgia, 'Palatino Linotype', 'Book Antiqua', 'Iowan Old Style', serif;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
   html,body{height:100%;}
@@ -24,10 +30,11 @@
     margin:0;
     min-height:100vh;
     background:
-      radial-gradient(ellipse at 50% -10%, #1c2340 0%, var(--ink) 55%),
-      var(--ink);
-    color:var(--paper);
-    font-family:var(--sans);
+      radial-gradient(ellipse at 50% 0%, rgba(0,0,0,0) 0%, rgba(0,0,0,0.5) 100%),
+      repeating-linear-gradient(100deg, var(--wood-mid) 0px, var(--wood-light) 3px, var(--wood-mid) 7px, var(--wood-dark) 11px),
+      var(--wood-dark);
+    color:var(--ink);
+    font-family:var(--serif);
     display:flex;
     flex-direction:column;
     align-items:center;
@@ -35,12 +42,103 @@
   }
 
   .frame{
+    position:relative;
     width:100%;
     max-width:480px;
     min-height:100vh;
     display:flex;
     flex-direction:column;
-    padding:18px 20px 28px;
+    padding:26px 24px 32px;
+    background:
+      radial-gradient(ellipse 60% 40% at 15% 8%, rgba(199,173,114,0.55) 0%, rgba(199,173,114,0) 60%),
+      radial-gradient(ellipse 50% 35% at 88% 92%, rgba(199,173,114,0.5) 0%, rgba(199,173,114,0) 60%),
+      radial-gradient(ellipse 40% 30% at 92% 15%, rgba(139,105,20,0.18) 0%, rgba(139,105,20,0) 65%),
+      repeating-linear-gradient(78deg, rgba(0,0,0,0.025) 0px, rgba(0,0,0,0) 1px, rgba(0,0,0,0.02) 2px, rgba(0,0,0,0) 4px),
+      linear-gradient(155deg, var(--parchment-light) 0%, var(--parchment) 55%, var(--parchment-shadow) 100%);
+    box-shadow: 0 18px 40px rgba(0,0,0,0.55);
+    clip-path: polygon(
+      0% 1.6%, 4% 0.4%, 8% 1.8%, 12% 0.2%, 16% 1.4%, 20% 0.3%, 24% 1.7%, 28% 0.4%,
+      32% 1.3%, 36% 0.2%, 40% 1.6%, 44% 0.3%, 48% 1.2%, 52% 0.2%, 56% 1.5%, 60% 0.3%,
+      64% 1.3%, 68% 0.2%, 72% 1.6%, 76% 0.3%, 80% 1.2%, 84% 0.2%, 88% 1.5%, 92% 0.3%,
+      96% 1.3%, 100% 0.4%,
+      100% 98.4%, 96% 99.6%, 92% 98.2%, 88% 99.8%, 84% 98.6%, 80% 99.7%, 76% 98.3%,
+      72% 99.6%, 68% 98.4%, 64% 99.8%, 60% 98.7%, 56% 99.7%, 52% 98.5%, 48% 99.8%,
+      44% 98.4%, 40% 99.7%, 36% 98.6%, 32% 99.8%, 28% 98.3%, 24% 99.6%, 20% 98.5%,
+      16% 99.8%, 12% 98.4%, 8% 99.7%, 4% 98.6%, 0% 99.6%
+    );
+  }
+
+  .frame::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    background-image:url('images/parchment-texture.jpg');
+    background-size:cover;
+    background-position:center;
+    background-repeat:no-repeat;
+    mix-blend-mode:multiply;
+    opacity:0.85;
+    pointer-events:none;
+  }
+
+  /* ---- intro: message in a bottle ---- */
+  .intro{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:18px;
+    padding:20px 0;
+  }
+  .bottle-btn{
+    background:none;
+    border:none;
+    padding:0;
+    cursor:pointer;
+    animation: bob 3.4s ease-in-out infinite;
+  }
+  .bottle-btn:active{ transform: scale(0.96); }
+  @keyframes bob{
+    0%,100%{ transform: translateY(0) rotate(-1deg); }
+    50%{ transform: translateY(-8px) rotate(1deg); }
+  }
+  .intro-hint{
+    font-family:var(--serif);
+    font-style:italic;
+    font-size:14px;
+    color:var(--ink-faded);
+    letter-spacing:0.02em;
+    margin:0;
+  }
+
+  /* ---- letter screen ---- */
+  .letter-screen{
+    flex:1;
+    min-height:0;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    gap:16px;
+    padding:20px 4px;
+  }
+  .letter-text{
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+    max-height:48vh;
+    padding-right:8px;
+  }
+  .letter-text p{
+    font-family:var(--serif);
+    font-size:15.5px;
+    line-height:1.7;
+    color:var(--ink);
+    margin:0 0 12px;
+  }
+  .letter-text .sign-off{
+    font-style:italic;
+    color:var(--ink-faded);
+    margin-top:18px;
   }
 
   /* ---- status bar ---- */
@@ -49,37 +147,41 @@
     justify-content:space-between;
     align-items:baseline;
     padding-bottom:14px;
-    border-bottom:1px solid rgba(237,234,226,0.12);
+    border-bottom:1px solid rgba(46,29,14,0.3);
   }
   .status .eyebrow{
-    font-family:var(--mono);
-    font-size:11px;
-    letter-spacing:0.14em;
-    color:var(--brass);
-    text-transform:uppercase;
+    font-family:var(--serif);
+    font-variant:small-caps;
+    font-size:14px;
+    letter-spacing:0.1em;
+    color:var(--wax-dark);
+    font-style:italic;
   }
   .status .stopname{
-    font-size:19px;
-    font-weight:600;
+    font-family:var(--serif);
+    font-size:20px;
+    font-weight:700;
     margin-top:4px;
-    letter-spacing:-0.01em;
+    letter-spacing:0.01em;
+    color:var(--ink);
   }
   .status .count{
     font-family:var(--mono);
-    font-size:13px;
-    color:var(--paper-dim);
+    font-size:12px;
+    color:var(--ink-faded);
   }
 
   /* ---- compass dial ---- */
   .dial-wrap{
     position:relative;
-    margin:38px auto 6px;
+    margin:34px auto 6px;
     width:min(78vw, 300px);
     height:min(78vw, 300px);
   }
   svg.dial-face{
     position:absolute; inset:0;
     width:100%; height:100%;
+    filter: drop-shadow(0 2px 3px rgba(46,29,14,0.35));
   }
   .needle{
     position:absolute;
@@ -95,32 +197,33 @@
     position:absolute;
     top:50%; left:50%;
     transform:translate(-50%,-50%);
-    width:14px; height:14px;
+    width:16px; height:16px;
     border-radius:50%;
-    background:var(--brass);
-    box-shadow:0 0 0 4px var(--ink), 0 0 14px rgba(214,163,74,0.6);
+    background: radial-gradient(circle at 35% 30%, var(--gold-bright), var(--gold) 60%, #7a5c08 100%);
+    box-shadow:0 0 0 4px var(--parchment), 0 0 0 5px rgba(46,29,14,0.4), 0 1px 2px rgba(0,0,0,0.4);
   }
 
   .readout{
     text-align:center;
-    margin-top:10px;
+    margin-top:8px;
   }
   .readout .distance{
     font-family:var(--mono);
-    font-size:38px;
-    font-weight:600;
+    font-size:36px;
+    font-weight:700;
     letter-spacing:-0.02em;
-    color:var(--paper);
+    color:var(--ink);
   }
   .readout .distance small{
-    font-size:16px;
-    color:var(--paper-dim);
+    font-size:15px;
+    color:var(--ink-faded);
     font-weight:400;
   }
   .readout .hint{
-    font-family:var(--mono);
-    font-size:12px;
-    color:var(--teal);
+    font-family:var(--serif);
+    font-style:italic;
+    font-size:13px;
+    color:var(--verdigris);
     margin-top:6px;
     min-height:16px;
   }
@@ -131,41 +234,50 @@
     padding-top:24px;
   }
   .gate p{
+    font-family:var(--serif);
     font-size:14px;
-    line-height:1.5;
-    color:var(--paper-dim);
+    line-height:1.55;
+    color:var(--ink-2);
     margin:0 0 16px;
   }
 
   button.primary{
     width:100%;
-    padding:16px;
-    border:none;
+    padding:15px;
+    border:1px solid var(--ink);
     border-radius:2px;
-    background:var(--brass);
+    background:
+      linear-gradient(155deg, var(--gold-bright) 0%, var(--gold) 100%);
     color:var(--ink);
-    font-size:15px;
+    font-family:var(--serif);
+    font-variant:small-caps;
+    font-size:16px;
     font-weight:700;
-    letter-spacing:0.02em;
+    letter-spacing:0.04em;
     cursor:pointer;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.25), 0 2px 4px rgba(46,29,14,0.3);
   }
-  button.primary:active{background:var(--brass-dim);}
+  button.primary:active{
+    background: linear-gradient(155deg, var(--gold) 0%, #93700d 100%);
+    box-shadow: inset 0 1px 3px rgba(46,29,14,0.4);
+  }
   button.ghost{
     width:100%;
-    padding:14px;
+    padding:13px;
     margin-top:10px;
-    border:1px solid rgba(237,234,226,0.25);
+    border:1px solid rgba(46,29,14,0.35);
     border-radius:2px;
-    background:transparent;
-    color:var(--paper);
-    font-size:13px;
+    background:rgba(46,29,14,0.04);
+    color:var(--ink-2);
+    font-size:12px;
     cursor:pointer;
     font-family:var(--mono);
   }
 
   .error-msg{
-    font-family:var(--mono);
-    font-size:12px;
+    font-family:var(--serif);
+    font-style:italic;
+    font-size:13px;
     color:var(--danger);
     margin-top:10px;
     line-height:1.5;
@@ -175,22 +287,41 @@
   .arrival{
     margin-top:auto;
     padding-top:22px;
-    border-top:1px solid rgba(127,163,127,0.35);
+    border-top:2px dashed rgba(122,46,46,0.4);
     display:none;
+    animation: unfurl 0.5s ease-out;
+    transform-origin: top center;
+  }
+  @keyframes unfurl{
+    from{ transform: scaleY(0.75); opacity:0; }
+    to{ transform: scaleY(1); opacity:1; }
   }
   .arrival.show{display:block;}
   .arrival .tag{
-    font-family:var(--mono);
-    font-size:11px;
-    letter-spacing:0.14em;
-    color:var(--ok);
-    text-transform:uppercase;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-family:var(--serif);
+    font-variant:small-caps;
+    font-size:15px;
+    font-weight:700;
+    letter-spacing:0.06em;
+    color:var(--wax-dark);
+  }
+  .arrival .tag::before{
+    content:"";
+    width:14px; height:14px;
+    border-radius:50%;
+    background: radial-gradient(circle at 35% 30%, #a44848, var(--wax) 55%, var(--wax-dark) 100%);
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.25);
+    flex:none;
   }
   .arrival .msg{
-    font-size:15px;
-    line-height:1.55;
+    font-family:var(--serif);
+    font-size:15.5px;
+    line-height:1.6;
     margin:10px 0 16px;
-    color:var(--paper);
+    color:var(--ink);
   }
   .play-row{
     display:flex;
@@ -199,40 +330,41 @@
     margin-bottom:16px;
   }
   .play-btn{
-    width:52px;height:52px;
+    width:50px;height:50px;
     flex:none;
     border-radius:50%;
-    border:2px solid var(--ok);
-    background:transparent;
-    color:var(--ok);
-    font-size:18px;
+    border:2px solid var(--verdigris);
+    background:rgba(63,107,92,0.08);
+    color:var(--verdigris);
+    font-size:16px;
     cursor:pointer;
     display:flex;align-items:center;justify-content:center;
   }
   .play-track{
     flex:1;
     height:2px;
-    background:rgba(127,163,127,0.25);
+    background:rgba(63,107,92,0.25);
     position:relative;
     border-radius:2px;
   }
   .play-track .fill{
     position:absolute; left:0; top:0; bottom:0;
     width:0%;
-    background:var(--ok);
+    background:var(--verdigris);
     border-radius:2px;
   }
 
   /* ---- test drawer ---- */
   .testdrawer{
     margin-top:16px;
-    border-top:1px dashed rgba(237,234,226,0.15);
+    border-top:1px solid rgba(46,29,14,0.2);
     padding-top:12px;
   }
   .testdrawer summary{
-    font-family:var(--mono);
-    font-size:11px;
-    color:var(--paper-dim);
+    font-family:var(--serif);
+    font-style:italic;
+    font-size:12px;
+    color:var(--ink-faded);
     cursor:pointer;
   }
   .testdrawer .row{
@@ -242,9 +374,9 @@
   }
   .testdrawer input[type=number]{
     width:100%;
-    background:var(--ink-2);
-    border:1px solid rgba(237,234,226,0.15);
-    color:var(--paper);
+    background:rgba(255,255,255,0.35);
+    border:1px solid rgba(46,29,14,0.3);
+    color:var(--ink);
     font-family:var(--mono);
     font-size:12px;
     padding:8px;
@@ -253,7 +385,7 @@
   .testdrawer label{
     font-family:var(--mono);
     font-size:10px;
-    color:var(--paper-dim);
+    color:var(--ink-faded);
     display:block;
     margin-bottom:4px;
   }
@@ -262,14 +394,24 @@
   .done{
     text-align:center;
     margin-top:auto;
-    padding-top:60px;
+    padding-top:50px;
   }
   .done h1{
-    font-size:26px;
-    margin-bottom:10px;
+    font-family:var(--serif);
+    font-variant:small-caps;
+    font-size:28px;
+    margin-bottom:6px;
+    color:var(--ink);
+  }
+  .done .flourish{
+    width:120px;
+    margin:0 auto 14px;
+    display:block;
   }
   .done p{
-    color:var(--paper-dim);
+    font-family:var(--serif);
+    font-style:italic;
+    color:var(--ink-faded);
     font-size:14px;
   }
 </style>
@@ -278,62 +420,104 @@
 
 <div class="frame" id="frame">
 
-  <div class="status">
+  <div class="intro" id="introScreen">
+    <button class="bottle-btn" id="bottleBtn" aria-label="Öffne die Nachricht">
+      <svg viewBox="0 0 140 220" width="130" height="204" role="img">
+        <title>Eine Flasche mit einer Nachricht</title>
+        <ellipse cx="70" cy="207" rx="26" ry="5" fill="#160f09" opacity="0.25"/>
+        <path d="M58,45 C58,55 40,62 34,90 C28,120 28,160 34,182 C40,200 52,210 70,210 C88,210 100,200 106,182 C112,160 112,120 106,90 C100,62 82,55 82,45 Z"
+              fill="rgba(63,107,92,0.16)" stroke="#2E1D0E" stroke-width="2.5"/>
+        <rect x="58" y="14" width="24" height="34" rx="5" fill="rgba(63,107,92,0.16)" stroke="#2E1D0E" stroke-width="2.5"/>
+        <rect x="55" y="2" width="30" height="16" rx="4" fill="#6b4423" stroke="#2E1D0E" stroke-width="2"/>
+        <path d="M50,95 Q70,85 90,95 L88,142 Q70,152 52,142 Z" fill="#EFE0B3" stroke="#2E1D0E" stroke-width="1.5" opacity="0.92"/>
+        <line x1="58" y1="108" x2="82" y2="106" stroke="#7A5230" stroke-width="1" opacity="0.5"/>
+        <line x1="58" y1="118" x2="82" y2="117" stroke="#7A5230" stroke-width="1" opacity="0.5"/>
+        <line x1="58" y1="128" x2="80" y2="127" stroke="#7A5230" stroke-width="1" opacity="0.5"/>
+        <path d="M40,60 L45,72 M97,64 L102,56" stroke="#EFE0B3" stroke-width="3" stroke-linecap="round" opacity="0.5"/>
+      </svg>
+    </button>
+    <p class="intro-hint">Tippe auf die Flasche</p>
+  </div>
+
+  <!-- EDIT THIS: the letter text shown after the bottle is opened -->
+  <div class="letter-screen" id="letterScreen" style="display:none;">
+    <div class="letter-text">
+      <p>Wer auch immer diese Nachricht liest. Ich brauche eure Hilfe. Mein Name ist Hieronymus Püdelheim. Ich lief Bruch auf den Weiten des Rheins. 19 Sonnen und 19 Monde trieb ich führungslos umher, bis ich endlich auf Land stieß. Oh, ich gebeutelte Seele. Sollte ich doch kein grausiges Ende auf See finden? Nein. Dort wo wochenlang nur den Kuss von nassem Holz und seichter Gischt vernahm, dort wärmte nun Mutter Erde meine blanken Füße. Sand, Schlamm, Kies, saftiges Gras und sogar warmer Asphalt. Ich war gerettet. Doch ich hatte ich alles verloren. Nicht nur Prunk und Flodder. Auch die Gallerie meiner Vergangenheit war aus meiner Hirnrinde gestrichen. Hieronymus. Das war mein Name. Alles andere war vernebelt. Dieser Ort. der als Hodenkirchen an mein Gehör trat, stellte sich als beschaulich hinaus.</p>
+      <p>Ich armer Tor irrte umher auf der Suche nach mir selbst. Was der Hodenkirchener Adel zu seien schien, bot mir seine Hilfe an. Sie teilen Brot und Spiel mit mir. Und es war mir, als wäre ich einer von ihnen.
+Bei einem Spiel aus Schlag und Ball und Loch, lernte ich die hiesigen Gebräuche.</p>
+      <p>Doch was meine Obhut war, war nicht mein Heim. So packte ich mein Bündel, denn es Zeit für mich zu ziehen. Weiter gen Norden, am Flussufer entlang. Dieser elendige Fluss, der mich von Haus und Hof und meiner selbst trennte.</p>
+      <p class="sign-off">— Hieronymus</p>
+    </div>
+    <div class="play-row">
+      <button class="play-btn" id="introPlayBtn">▶</button>
+      <div class="play-track"><div class="fill" id="introPlayFill"></div></div>
+    </div>
+    <button class="primary" id="beginBtn">Die Reise beginnt</button>
+  </div>
+
+  <div class="status" id="statusBar">
     <div>
-      <div class="eyebrow">HIERONYMUS TAGEBUCH <span id="versionTag" style="color:var(--paper-dim); font-weight:400; letter-spacing:0.05em;"></span></div>
+      <div class="eyebrow">HIERONYMUS TAGEBUCH <span id="versionTag" style="color:var(--ink-faded); font-style:normal; font-size:11px; font-family:var(--mono); letter-spacing:0.05em;"></span></div>
       <div class="stopname" id="stopName">—</div>
     </div>
     <div class="count" id="stopCount">0 / 0</div>
   </div>
 
-  <div class="dial-wrap" id="dialWrap">
+  <div class="error-msg" id="errBox" style="display:none;"></div>
+
+  <div class="dial-wrap" id="dialWrap" style="display:none;">
     <svg class="dial-face" viewBox="0 0 300 300">
-      <circle cx="150" cy="150" r="140" fill="none" stroke="rgba(237,234,226,0.15)" stroke-width="1"/>
-      <circle cx="150" cy="150" r="112" fill="none" stroke="rgba(237,234,226,0.08)" stroke-width="1"/>
+      <g id="rosePoints"></g>
+      <circle cx="150" cy="150" r="140" fill="none" stroke="#2E1D0E" stroke-opacity="0.4" stroke-width="1.5"/>
+      <circle cx="150" cy="150" r="112" fill="none" stroke="#2E1D0E" stroke-opacity="0.22" stroke-width="1"/>
+      <circle cx="150" cy="150" r="46" fill="none" stroke="#2E1D0E" stroke-opacity="0.22" stroke-width="1"/>
       <g id="ticks"></g>
-      <text x="150" y="30" text-anchor="middle" fill="#8a6f37" font-family="SFMono-Regular,Consolas,monospace" font-size="13" letter-spacing="2">N</text>
-      <text x="270" y="155" text-anchor="middle" fill="rgba(237,234,226,0.35)" font-family="SFMono-Regular,Consolas,monospace" font-size="12">E</text>
-      <text x="150" y="278" text-anchor="middle" fill="rgba(237,234,226,0.35)" font-family="SFMono-Regular,Consolas,monospace" font-size="12">S</text>
-      <text x="30" y="155" text-anchor="middle" fill="rgba(237,234,226,0.35)" font-family="SFMono-Regular,Consolas,monospace" font-size="12">W</text>
+      <polygon points="150,16 145,26 155,26" fill="#7A2E2E" opacity="0.85"/>
+      <text x="150" y="30" text-anchor="middle" fill="#5C1F1F" font-family="Georgia,serif" font-weight="700" font-size="15" letter-spacing="1">N</text>
+      <text x="272" y="155" text-anchor="middle" fill="#4a3520" font-family="Georgia,serif" font-size="13">E</text>
+      <text x="150" y="280" text-anchor="middle" fill="#4a3520" font-family="Georgia,serif" font-size="13">S</text>
+      <text x="28" y="155" text-anchor="middle" fill="#4a3520" font-family="Georgia,serif" font-size="13">W</text>
     </svg>
     <div class="needle" id="needle">
       <svg viewBox="0 0 300 300">
-        <polygon points="150,38 162,150 150,140 138,150" fill="#D6A34A"/>
-        <polygon points="150,262 162,150 150,160 138,150" fill="#5C7285"/>
+        <polygon points="150,38 162,150 150,140 138,150" fill="#B8860B" stroke="#2E1D0E" stroke-width="2" stroke-linejoin="round"/>
+        <polygon points="150,262 162,150 150,160 138,150" fill="#5C1F1F" stroke="#2E1D0E" stroke-width="2" stroke-linejoin="round"/>
       </svg>
     </div>
     <div class="dial-center"></div>
   </div>
 
-  <div class="readout">
+  <div class="readout" style="display:none;">
     <div class="distance" id="distanceOut">— <small>m</small></div>
-    <div class="hint" id="hintOut">waiting for position…</div>
+    <div class="hint" id="hintOut">Ich suche dich…</div>
   </div>
 
-  <div class="gate" id="gate">
-    <p>Uses your phone's GPS and compass to point toward each stop. Tap start and allow location + motion access when your browser asks.</p>
-    <button class="primary" id="startBtn">Start the trail</button>
-    <div class="error-msg" id="errBox" style="display:none;"></div>
+  <div class="gate" id="gate" style="display:none;">
+    <button class="primary" id="startBtn">HÖRE MEINE WORTE...</button>
   </div>
 
   <div class="arrival" id="arrivalPanel">
-    <div class="tag">You've arrived</div>
+    <div class="tag">X marks the spot</div>
     <div class="msg" id="arrivalMsg"></div>
     <div class="play-row">
       <button class="play-btn" id="playBtn">▶</button>
       <div class="play-track"><div class="fill" id="playFill"></div></div>
     </div>
-    <button class="primary" id="nextBtn">Continue to next stop</button>
+    <button class="primary" id="nextBtn">Chart the next course</button>
     <div class="error-msg" id="playErrBox" style="display:none;"></div>
   </div>
 
   <div class="done" id="doneScreen" style="display:none;">
-    <h1>Trail complete</h1>
-    <p>Everyone made it. Nicely done.</p>
+    <h1>Voyage complete</h1>
+    <svg class="flourish" viewBox="0 0 120 16" fill="none">
+      <path d="M0 8 Q20 0 40 8 T80 8 T120 8" stroke="#6b5738" stroke-width="1"/>
+      <circle cx="60" cy="8" r="3" fill="#B8860B"/>
+    </svg>
+    <p>Every stop found. Well sailed.</p>
   </div>
 
   <details class="testdrawer">
-    <summary>Test mode (no real GPS needed)</summary>
+    <summary>Navigator's notes (test without real GPS)</summary>
     <div class="row">
       <div style="flex:1">
         <label>Simulated latitude</label>
@@ -370,12 +554,12 @@
    ============================================================ */
 const STOPS = [
   {
-    name: "Ein 800 Jahre altes Tor",
-   lat: 50.936506, 
-    lng: 6.940034,
+    name: "Kölner Dom",
+    lat: 50.9413,
+    lng: 6.9583,
     radius: 40,
     audioSrc: "audio/stop1.mp3",
-    message: "Wer auch immer diese Nachricht liest. Ich brauche eure Hilfe. Mein Name ist Hieronymus von Püdelheim. Ich lief Bruch auf den Weiten des Rheins. 19 Sonnen und 19 Monde trieb ich führungslos umher, bis ich endlich auf Land stieß. Oh, ich gebeutelte Seele. Sollte ich doch kein grausiges Ende auf See finden? Nein. Dort wo wochenlang nur den Kuss von nassem Holz und seichter Gischt vernahm, dort wärmte nun Mutter Erde meine blanken Füße. Sand, Schlamm, Kies, saftiges Gras und sogar warmer Asphalt. Ich war gerettet. Doch ich hatte ich alles verloren. Nicht nur Prunk und Flodder. Auch die Gallerie meiner Vergangenheit war aus meiner Hirnrinde gestrichen. Hieronymus. Das war mein Name. Alles andere war vernebelt. Dieser Ort. der als Hodenkirchen an mein Gehör trat, stellte sich als beschaulich hinaus. Ich armer Tor irrte umher auf der Suche nach mir selbst. Was der Hodenkirchener Adel zu seien schien, bot mir seine Hilfe an. Sie teilen Brot und Spiel mit mir. Und es war mir, als wäre ich einer von ihnen. Bei einem Spiel aus Schlag und Ball und Loch, lernte ich die hiesigen Gebräuche. Doch was meine Obhut war, war nicht mein Heim. So packte ich mein Bündel, denn es Zeit für mich zu ziehen. Weiter gen Norden, am Flussufer entlang. Dieser elendige Fluss, der mich von Haus und Hof und meiner selbst trennte."
+    message: "You made it to the cathedral. Look up at the north tower — count the gargoyles and text me the number."
   },
   {
     name: "Hohenzollernbrücke",
@@ -404,7 +588,7 @@ const STOPS = [
 ];
 /* ============================================================ */
 
-const APP_VERSION = "1.2.0";
+const APP_VERSION = "1.5.1";
 
 let current = 0;
 let rawPos = null;       // {lat, lng} straight from the GPS
@@ -419,6 +603,12 @@ let orientationHandlerAttached = false;
 let smoothLoopStarted = false;
 
 const el = id => document.getElementById(id);
+const introScreen = el('introScreen');
+const bottleBtn = el('bottleBtn');
+const letterScreen = el('letterScreen');
+const introPlayBtn = el('introPlayBtn');
+const introPlayFill = el('introPlayFill');
+const beginBtn = el('beginBtn');
 const stopNameEl = el('stopName');
 const stopCountEl = el('stopCount');
 const distanceOut = el('distanceOut');
@@ -449,9 +639,34 @@ el('versionTag').textContent = `· v${APP_VERSION}`;
     const line = document.createElementNS("http://www.w3.org/2000/svg","line");
     line.setAttribute("x1",x1); line.setAttribute("y1",y1);
     line.setAttribute("x2",x2); line.setAttribute("y2",y2);
-    line.setAttribute("stroke", i%6===0 ? "rgba(214,163,74,0.5)" : "rgba(237,234,226,0.15)");
+    line.setAttribute("stroke", i%6===0 ? "rgba(139,105,20,0.6)" : "rgba(46,29,14,0.22)");
     line.setAttribute("stroke-width", i%6===0 ? "2" : "1");
     g.appendChild(line);
+  }
+})();
+
+// draw an 8-point antique compass rose behind the dial — purely decorative
+(function drawRose(){
+  const g = el('rosePoints');
+  const cx=150, cy=150, rOuter=138, rInner=44;
+  for(let i=0;i<8;i++){
+    const aTip = (i*45) * Math.PI/180;
+    const a1 = (i*45 - 22.5) * Math.PI/180;
+    const a2 = (i*45 + 22.5) * Math.PI/180;
+    const tipX = cx + rOuter*Math.sin(aTip), tipY = cy - rOuter*Math.cos(aTip);
+    const leftX = cx + rInner*Math.sin(a1), leftY = cy - rInner*Math.cos(a1);
+    const rightX = cx + rInner*Math.sin(a2), rightY = cy - rInner*Math.cos(a2);
+    const isCardinal = i%2===0;
+    const half1 = document.createElementNS("http://www.w3.org/2000/svg","polygon");
+    half1.setAttribute("points", `${cx},${cy} ${leftX},${leftY} ${tipX},${tipY}`);
+    half1.setAttribute("fill", isCardinal ? "#8B6914" : "#6b5330");
+    half1.setAttribute("opacity", isCardinal ? "0.55" : "0.32");
+    g.appendChild(half1);
+    const half2 = document.createElementNS("http://www.w3.org/2000/svg","polygon");
+    half2.setAttribute("points", `${cx},${cy} ${rightX},${rightY} ${tipX},${tipY}`);
+    half2.setAttribute("fill", isCardinal ? "#B8860B" : "#8a7040");
+    half2.setAttribute("opacity", isCardinal ? "0.65" : "0.38");
+    g.appendChild(half2);
   }
 })();
 
@@ -523,9 +738,9 @@ function updateDial(){
     // never spins the "long way" around when crossing the 0/360 seam
     needleRotation += angleDiff(needleRotation % 360, targetRotation);
     needle.style.transform = `rotate(${needleRotation}deg)`;
-    hintOut.textContent = dist <= target.radius ? '' : 'walk toward the arrow';
+    hintOut.textContent = dist <= target.radius ? '' : 'Folge meiner Spur.';
   } else {
-    hintOut.textContent = 'point your phone flat to calibrate compass';
+    hintOut.textContent = 'Lege dein Telefon flach hin, um es zu kalibrieren.';
   }
 
   if(!arrived && dist <= target.radius){
@@ -745,11 +960,54 @@ async function requestPermissionsAndStart(){
 
 startBtn.addEventListener('click', requestPermissionsAndStart);
 
+// ---- message in a bottle: intro screen -> letter screen -> compass ----
+// Two separate direct taps now happen: opening the bottle, and "Die Reise
+// beginnt". Both are user gestures, so either one is a valid place to
+// request location/compass permission on iOS — we do it on the begin
+// button, right before the compass actually needs to appear.
+let introAudioEl = null;
+
+function setupIntroAudio(){
+  introAudioEl = new Audio('audio/intro.mp3');
+  introAudioEl.ontimeupdate = ()=>{
+    if(introAudioEl.duration) introPlayFill.style.width = `${(introAudioEl.currentTime/introAudioEl.duration)*100}%`;
+  };
+  introAudioEl.onended = ()=>{ introPlayBtn.textContent='▶'; introPlayFill.style.width='100%'; };
+  const p = introAudioEl.play();
+  if(p && typeof p.then === 'function'){
+    p.then(()=>{ introPlayBtn.textContent='❚❚'; }).catch(()=>{ introPlayBtn.textContent='▶'; });
+  }
+}
+
+introPlayBtn.addEventListener('click', ()=>{
+  if(!introAudioEl) return;
+  if(introAudioEl.paused){
+    introAudioEl.play().then(()=>{ introPlayBtn.textContent='❚❚'; }).catch(()=>{});
+  } else {
+    introAudioEl.pause();
+    introPlayBtn.textContent='▶';
+  }
+});
+
+bottleBtn.addEventListener('click', ()=>{
+  bottleBtn.disabled = true;
+  introScreen.style.display = 'none';
+  letterScreen.style.display = '';
+  try{ setupIntroAudio(); }catch(e){} // missing/blocked intro.mp3 shouldn't stop the letter from showing
+});
+
+beginBtn.addEventListener('click', ()=>{
+  letterScreen.style.display = 'none';
+  requestPermissionsAndStart();
+});
+
 // ---- test mode (for previewing without real GPS/compass) ----
 el('simToggle').addEventListener('click', ()=>{
   testMode = !testMode;
   el('simToggle').textContent = testMode ? 'Disable test mode' : 'Enable test mode';
   if(testMode){
+    introScreen.style.display = 'none';
+    letterScreen.style.display = 'none';
     gate.style.display = 'none';
     startSmoothingLoop();
     loadStop(current);
