@@ -166,6 +166,35 @@
     padding:20px 0;
   }
 
+  /* ---- password screen (between letter 1 and letter 2 at a stop) ---- */
+  .password-screen{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:16px;
+    padding:20px 0;
+  }
+  .password-input{
+    width:100%;
+    max-width:280px;
+    padding:14px 16px;
+    border:1px solid rgba(46,29,14,0.4);
+    border-radius:2px;
+    background:rgba(255,255,255,0.4);
+    color:var(--ink);
+    font-family:var(--serif);
+    font-size:18px;
+    text-align:center;
+    letter-spacing:0.04em;
+  }
+  .password-input:focus{
+    outline:none;
+    border-color:var(--gold);
+    box-shadow:0 0 0 2px rgba(184,134,11,0.25);
+  }
+
   /* ---- status bar ---- */
   .status{
     display:flex;
@@ -574,6 +603,22 @@ Bei einem Spiel aus Schlag und Ball und Loch, lernte ich die hiesigen Gebräuche
     <p class="intro-hint">Ein Brief wartet auf Dich</p>
   </div>
 
+  <div class="letter-screen" id="letterReviewScreen" style="display:none;">
+    <div class="letter-text">
+      <p id="letterReviewText"></p>
+    </div>
+    <div class="play-row">
+      <button class="play-btn" id="reviewPlayBtn">▶</button>
+      <div class="play-track" id="reviewPlayTrack">
+        <div class="line">
+          <div class="fill" id="reviewPlayFill"></div>
+          <div class="handle" id="reviewPlayHandle"></div>
+        </div>
+      </div>
+    </div>
+    <button class="ghost" id="closeReviewBtn">Zurück zum Kompass</button>
+  </div>
+
   <div class="arrival" id="arrivalPanel">
 
     <div class="msg" id="arrivalMsg"></div>
@@ -588,6 +633,15 @@ Bei einem Spiel aus Schlag und Ball und Loch, lernte ich die hiesigen Gebräuche
     </div>
     <button class="primary" id="nextBtn">Weiter</button>
     <div class="error-msg" id="playErrBox" style="display:none;"></div>
+  </div>
+
+  <div class="password-screen" id="passwordScreen" style="display:none;">
+    <p class="intro-hint">Löse das Rätsel vor Ort, um fortzufahren.</p>
+    <div style="width:100%; max-width:280px; display:flex; flex-direction:column; gap:12px;">
+      <input type="text" id="passwordInput" class="password-input" placeholder="Lösungswort" autocapitalize="off" autocomplete="off" spellcheck="false">
+      <button class="primary" id="passwordSubmitBtn">Bestätigen</button>
+    </div>
+    <div class="error-msg" id="passwordError" style="display:none;"></div>
   </div>
 
   <div class="done" id="doneScreen" style="display:none;">
@@ -620,8 +674,8 @@ Bei einem Spiel aus Schlag und Ball und Loch, lernte ich die hiesigen Gebräuche
     <button class="ghost" id="simApply">Apply simulated position</button>
     <button class="ghost" id="simToggle">Enable test mode</button>
     <div class="row row2">
-      <button class="ghost" id="prevStopBtn" style="flex:1;">◀ Previous Location</button>
-      <button class="ghost" id="nextStopBtn" style="flex:1;">Next Location ▶</button>
+      <button class="ghost" id="prevStopBtn" style="flex:1;">◀ Previous Step</button>
+      <button class="ghost" id="nextStopBtn" style="flex:1;">Next Step ▶</button>
     </div>
     <button class="ghost" id="resetJourneyBtn" style="margin-top:10px; border-color:var(--danger); color:var(--danger);">Reset Journey</button>
   </details>
@@ -634,49 +688,88 @@ Bei einem Spiel aus Schlag und Ball und Loch, lernte ich die hiesigen Gebräuche
    lat/lng: the target coordinates (right-click a spot on
             Google Maps -> the numbers are your lat, lng).
    radius:  meters — how close counts as "arrived".
-   audioSrc: filename of a voice recording placed in the SAME
-             folder as this HTML file (e.g. "stop1.mp3").
-             Leave as "" to have the message read aloud instead.
-   message: shown as text always, and used as the spoken
-            fallback if audioSrc is missing or fails to load.
+
+   Each stop now has TWO letters with a password puzzle between them:
+     1. Arriving triggers letter1 (text + audio, same as before).
+     2. After letter1, a password field appears instead of moving on.
+        The password is something found at that physical location
+        (a sign, an object, something a shopkeeper tells them, etc.)
+     3. Entering it correctly (case-insensitive, whitespace trimmed)
+        reveals letter2 — another letter to open, same way as letter1.
+     4. After letter2, the compass leads to the next stop.
+
+   letter1 / letter2: { audioSrc, message } — same rules as before:
+     audioSrc is a filename in audio/, leave "" to read message
+     aloud instead. message is shown as text always.
+   password: leave "" (or omit letter2) to skip the puzzle entirely —
+     the stop then behaves like before, going straight to the next
+     location after letter1.
    ============================================================ */
 const STOPS = [
   {
     name: "Beautee Bubble Tea",
     lat: 50.93697575860792, 
     lng: 6.940338382672812,
-    radius: 10,
-    audioSrc: "audio/stop1.mp3",
-    message: "Ich habe einen Bubble Tea getrunken. Der war sehr schmackhaft."
+    radius: 20,
+    letter1: {
+      audioSrc: "audio/stop1-1.mp3",
+      message: "Ich habe einen Bubble Tea getrunken. Der war sehr schmackhaft."
+    },
+    password: "PERLEN",
+    letter2: {
+      audioSrc: "audio/stop1-2.mp3",
+      message: "EDIT THIS: der zweite Brief für diesen Ort, freigeschaltet nach dem Passwort."
+    }
   },
   {
     name: "Hahentor",
     lat: 50.93643547752539, 
     lng: 6.940158623883777,
-    radius: 5,
-    audioSrc: "audio/stop2.mp3",
-    message: "800 Jahre alte Geschichte ist hier greifbar."
+    radius: 30,
+    letter1: {
+      audioSrc: "audio/stop2-1.mp3",
+      message: "800 Jahre alte Geschichte ist hier greifbar."
+    },
+    password: "TOR",
+    letter2: {
+      audioSrc: "audio/stop2-2.mp3",
+      message: "EDIT THIS: der zweite Brief für diesen Ort, freigeschaltet nach dem Passwort."
+    }
   },
   {
     name: "Giga Center",
     lat: 50.936915925793876, 
     lng: 6.938837950384127,
-    radius: 10,
-    audioSrc: "audio/stop3.mp3",
-    message: "Hier wird gespielt und gelacht."
+    radius: 20,
+    letter1: {
+      audioSrc: "audio/stop3-1.mp3",
+      message: "Hier wird gespielt und gelacht."
+    },
+    password: "SPIEL",
+    letter2: {
+      audioSrc: "audio/stop3-2.mp3",
+      message: "EDIT THIS: der zweite Brief für diesen Ort, freigeschaltet nach dem Passwort."
+    }
   },
   {
     name: "Lecker",
     lat: 50.93864224391797, 
     lng: 6.940703365241949,
-    radius: 5,
-    audioSrc: "audio/stop4.mp3",
-    message: "Es ist Zeit zu Essen, meine Lieben."
+    radius: 20,
+    letter1: {
+      audioSrc: "audio/stop4-1.mp3",
+      message: "Es ist Zeit zu Essen, meine Lieben."
+    },
+    password: "HUNGER",
+    letter2: {
+      audioSrc: "audio/stop4-2.mp3",
+      message: "EDIT THIS: der zweite Brief für diesen Ort, freigeschaltet nach dem Passwort."
+    }
   }
 ];
 /* ============================================================ */
 
-const APP_VERSION = "1.10.0";
+const APP_VERSION = "1.13.0";
 
 let current = 0;
 let rawPos = null;       // {lat, lng} straight from the GPS
@@ -689,6 +782,9 @@ let arrived = false;
 let testMode = false;
 let orientationHandlerAttached = false;
 let smoothLoopStarted = false;
+let letterStage = 1; // 1 = letter before the password, 2 = letter after it — resets to 1 on each new stop
+let stepPhase = 'arriving'; // used by the Previous/Next Step test buttons to simulate the whole journey
+let lastLetter = { type: 'intro' }; // or { type:'stop', stopIndex:N, stage:1|2 } — what "reopen the letter" should show
 
 const el = id => document.getElementById(id);
 const introScreen = el('introScreen');
@@ -705,6 +801,13 @@ const closeLetterBtn = el('closeLetterBtn');
 const reopenLetterBtn = el('reopenLetterBtn');
 const arrivalLetterPrompt = el('arrivalLetterPrompt');
 const arrivalLetterBtn = el('arrivalLetterBtn');
+const letterReviewScreen = el('letterReviewScreen');
+const letterReviewText = el('letterReviewText');
+const closeReviewBtn = el('closeReviewBtn');
+const reviewPlayBtn = el('reviewPlayBtn');
+const reviewPlayFill = el('reviewPlayFill');
+const reviewPlayTrack = el('reviewPlayTrack');
+const reviewPlayHandle = el('reviewPlayHandle');
 const stopNameEl = el('stopName');
 const stopCountEl = el('stopCount');
 const distanceOut = el('distanceOut');
@@ -721,6 +824,10 @@ const playBtn = el('playBtn');
 const playFill = el('playFill');
 const playTrack = el('playTrack');
 const playHandle = el('playHandle');
+const passwordScreen = el('passwordScreen');
+const passwordInput = el('passwordInput');
+const passwordSubmitBtn = el('passwordSubmitBtn');
+const passwordError = el('passwordError');
 const doneScreen = el('doneScreen');
 const dialWrap = el('dialWrap');
 
@@ -801,7 +908,7 @@ function bearingDeg(lat1,lon1,lat2,lon2){
 // ---- saving progress so a crash/reload doesn't lose the journey ----
 const PROGRESS_KEY = 'hieronymus_progress_v1';
 function saveProgress(){
-  try{ localStorage.setItem(PROGRESS_KEY, JSON.stringify({current})); }catch(e){}
+  try{ localStorage.setItem(PROGRESS_KEY, JSON.stringify({current, lastLetter})); }catch(e){}
 }
 function clearProgress(){
   try{ localStorage.removeItem(PROGRESS_KEY); }catch(e){}
@@ -811,13 +918,24 @@ function loadSavedProgress(){
     const raw = localStorage.getItem(PROGRESS_KEY);
     if(!raw) return null;
     const data = JSON.parse(raw);
-    if(typeof data.current === 'number' && data.current >= 0 && data.current < STOPS.length) return data;
+    if(typeof data.current !== 'number' || data.current < 0 || data.current >= STOPS.length) return null;
+    if(!data.lastLetter ||
+       (data.lastLetter.type === 'stop' && (typeof data.lastLetter.stopIndex !== 'number' || data.lastLetter.stopIndex >= STOPS.length)) ||
+       (data.lastLetter.type !== 'intro' && data.lastLetter.type !== 'stop')){
+      data.lastLetter = { type: 'intro' };
+    }
+    if(data.lastLetter.type === 'stop' && data.lastLetter.stage !== 1 && data.lastLetter.stage !== 2){
+      data.lastLetter.stage = 1;
+    }
+    return data;
   }catch(e){}
   return null;
 }
 
 function loadStop(i){
   arrived = false;
+  letterStage = 1;
+  stepPhase = 'arriving';
   arrivalPanel.classList.remove('show');
   arrivalLetterPrompt.style.display = 'none';
   document.querySelector('.status').style.display = '';
@@ -839,6 +957,7 @@ function finishTrail(){
   document.querySelector('.status').style.display = '';
   reopenLetterBtn.style.display = 'none';
   arrivalLetterPrompt.style.display = 'none';
+  passwordScreen.style.display = 'none';
   arrivalPanel.classList.remove('show');
   doneScreen.style.display = 'block';
   stopNameEl.textContent = "—";
@@ -892,17 +1011,18 @@ function triggerArrival(){
 
 arrivalLetterBtn.addEventListener('click', ()=>{
   arrivalLetterPrompt.style.display = 'none';
-  const s = STOPS[current];
-  arrivalMsg.textContent = s.message;
+  lastLetter = { type: 'stop', stopIndex: current, stage: letterStage };
+  const letter = letterStage === 1 ? STOPS[current].letter1 : STOPS[current].letter2;
+  arrivalMsg.textContent = letter.message;
   arrivalPanel.classList.add('show');
   playFill.style.width = '0%';
   playHandle.style.left = '0%';
   playBtn.textContent = '▶';
   playErrBox.style.display = 'none';
-  if(s.audioSrc){
-    playAudioFile(s); // this click is the direct user gesture, so autoplay is allowed
+  if(letter.audioSrc){
+    playAudioFile(letter); // this click is the direct user gesture, so autoplay is allowed
   } else {
-    speakFallback(s.message);
+    speakFallback(letter.message);
   }
 });
 
@@ -988,10 +1108,39 @@ function speakFallback(text){
 nextBtn.addEventListener('click', ()=>{
   if(audioEl){ audioEl.pause(); }
   window.speechSynthesis.cancel();
+  const hasPuzzle = !!STOPS[current].password && !!STOPS[current].letter2;
+  if(letterStage === 1 && hasPuzzle){
+    arrivalPanel.classList.remove('show');
+    showPasswordScreen();
+    return;
+  }
   current++;
   if(current >= STOPS.length){ finishTrail(); }
   else { loadStop(current); updateDial(); }
 });
+
+function showPasswordScreen(){
+  passwordError.style.display = 'none';
+  passwordInput.value = '';
+  passwordScreen.style.display = 'flex';
+  passwordInput.focus();
+}
+
+function checkPassword(){
+  const val = passwordInput.value.trim().toLowerCase();
+  const expected = (STOPS[current].password || '').trim().toLowerCase();
+  if(val && val === expected){
+    passwordScreen.style.display = 'none';
+    letterStage = 2;
+    arrivalLetterPrompt.style.display = 'flex';
+    playSuccessSound();
+  } else {
+    passwordError.style.display = 'block';
+    passwordError.textContent = 'Das ist nicht das richtige Wort. Versuch es erneut.';
+  }
+}
+passwordSubmitBtn.addEventListener('click', checkPassword);
+passwordInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') checkPassword(); });
 
 // ---- geolocation ----
 function startGeolocation(){
@@ -1187,18 +1336,57 @@ beginBtn.addEventListener('click', ()=>{
 // ---- reopening the letter mid-trail ----
 // This is a read-only replay, not the onboarding flow — it must not
 // call requestPermissionsAndStart() again (that would open a second
-// geolocation watch and re-request permissions unnecessarily).
+// geolocation watch and re-request permissions unnecessarily). It shows
+// whichever letter was most recently received (lastLetter), not always
+// the original bottle letter.
+let reviewAudioEl = null;
+function setupReviewAudio(src){
+  reviewPlayFill.style.width = '0%';
+  reviewPlayHandle.style.left = '0%';
+  reviewPlayBtn.textContent = '▶';
+  if(!src){ reviewAudioEl = null; return; }
+  reviewAudioEl = new Audio(src);
+  reviewAudioEl.ontimeupdate = ()=>{
+    if(reviewAudioEl.duration){
+      const pct = (reviewAudioEl.currentTime/reviewAudioEl.duration)*100;
+      reviewPlayFill.style.width = `${pct}%`;
+      reviewPlayHandle.style.left = `${pct}%`;
+    }
+  };
+  reviewAudioEl.onended = ()=>{ reviewPlayBtn.textContent='▶'; reviewPlayFill.style.width='100%'; reviewPlayHandle.style.left='100%'; };
+}
+reviewPlayBtn.addEventListener('click', ()=>{
+  if(!reviewAudioEl) return;
+  if(reviewAudioEl.paused){
+    reviewAudioEl.play().then(()=>{ reviewPlayBtn.textContent='❚❚'; }).catch(()=>{});
+  } else {
+    reviewAudioEl.pause();
+    reviewPlayBtn.textContent='▶';
+  }
+});
+setupSeekableTrack(reviewPlayTrack, reviewPlayHandle, reviewPlayFill, ()=>reviewAudioEl);
+
 function showLetterReview(){
   document.querySelector('.status').style.display = 'none';
   dialWrap.style.display = 'none';
   document.querySelector('.readout').style.display = 'none';
   reopenLetterBtn.style.display = 'none';
-  beginBtn.style.display = 'none';
-  closeLetterBtn.style.display = '';
-  letterScreen.style.display = '';
+  if(lastLetter.type === 'stop'){
+    const letter = lastLetter.stage === 2 ? STOPS[lastLetter.stopIndex].letter2 : STOPS[lastLetter.stopIndex].letter1;
+    letterReviewText.textContent = letter.message;
+    setupReviewAudio(letter.audioSrc || '');
+    letterReviewScreen.style.display = '';
+  } else {
+    beginBtn.style.display = 'none';
+    closeLetterBtn.style.display = '';
+    letterScreen.style.display = '';
+  }
 }
 function hideLetterReview(){
   letterScreen.style.display = 'none';
+  letterReviewScreen.style.display = 'none';
+  if(introAudioEl) introAudioEl.pause();
+  if(reviewAudioEl) reviewAudioEl.pause();
   beginBtn.style.display = '';
   closeLetterBtn.style.display = 'none';
   document.querySelector('.status').style.display = '';
@@ -1208,6 +1396,7 @@ function hideLetterReview(){
 }
 reopenLetterBtn.addEventListener('click', showLetterReview);
 closeLetterBtn.addEventListener('click', hideLetterReview);
+closeReviewBtn.addEventListener('click', hideLetterReview);
 
 // ---- test mode (for previewing without real GPS/compass) ----
 el('simToggle').addEventListener('click', ()=>{
@@ -1230,16 +1419,103 @@ el('simApply').addEventListener('click', ()=>{
   updateDial();
 });
 
-// ---- skip between stops (testing / manual override) ----
-function goToStop(delta){
-  const next = Math.min(STOPS.length - 1, Math.max(0, current + delta));
-  if(next === current) return;
-  current = next;
-  loadStop(current);
-  if(userPos) updateDial();
+// ---- full journey simulation (testing without real GPS or coordinates) ----
+// Steps through every screen a real hunt would show, in order: walking to
+// a stop -> arrival letter prompt -> letter open -> password (if the stop
+// has one) -> second letter prompt -> second letter open -> next stop.
+// Doesn't touch geolocation at all, so it works regardless of whether a
+// real GPS watch is running in the background.
+function getPhaseList(stopIndex){
+  const s = STOPS[stopIndex];
+  const hasPuzzle = !!s.password && !!s.letter2;
+  return hasPuzzle
+    ? ['arriving','letter1Prompt','letter1Open','password','letter2Prompt','letter2Open']
+    : ['arriving','letter1Prompt','letter1Open'];
 }
-el('prevStopBtn').addEventListener('click', ()=>goToStop(-1));
-el('nextStopBtn').addEventListener('click', ()=>goToStop(1));
+
+function renderPhase(phase){
+  arrivalLetterPrompt.style.display = 'none';
+  arrivalPanel.classList.remove('show');
+  passwordScreen.style.display = 'none';
+  dialWrap.style.display = 'none';
+  document.querySelector('.readout').style.display = 'none';
+  document.querySelector('.status').style.display = '';
+  reopenLetterBtn.style.display = 'none';
+
+  if(phase === 'arriving'){
+    arrived = false;
+    dialWrap.style.display = '';
+    document.querySelector('.readout').style.display = '';
+    reopenLetterBtn.style.display = '';
+  } else if(phase === 'letter1Prompt' || phase === 'letter2Prompt'){
+    arrived = true;
+    letterStage = phase === 'letter1Prompt' ? 1 : 2;
+    arrivalLetterPrompt.style.display = 'flex';
+  } else if(phase === 'letter1Open' || phase === 'letter2Open'){
+    arrived = true;
+    letterStage = phase === 'letter1Open' ? 1 : 2;
+    lastLetter = { type: 'stop', stopIndex: current, stage: letterStage };
+    const letter = letterStage === 1 ? STOPS[current].letter1 : STOPS[current].letter2;
+    arrivalMsg.textContent = letter.message;
+    playFill.style.width = '0%';
+    playHandle.style.left = '0%';
+    playBtn.textContent = '▶';
+    playErrBox.style.display = 'none';
+    arrivalPanel.classList.add('show');
+  } else if(phase === 'password'){
+    letterStage = 1;
+    passwordError.style.display = 'none';
+    passwordInput.value = '';
+    passwordScreen.style.display = 'flex';
+  }
+  stepPhase = phase;
+}
+
+function goToNextStep(){
+  ensureJourneyStarted();
+  const phases = getPhaseList(current);
+  const idx = phases.indexOf(stepPhase);
+  if(idx < phases.length - 1){
+    renderPhase(phases[idx + 1]);
+  } else if(current + 1 >= STOPS.length){
+    finishTrail();
+  } else {
+    current++;
+    loadStop(current);
+    if(userPos) updateDial();
+  }
+}
+
+function goToPrevStep(){
+  ensureJourneyStarted();
+  const phases = getPhaseList(current);
+  const idx = phases.indexOf(stepPhase);
+  if(idx > 0){
+    renderPhase(phases[idx - 1]);
+  } else if(current > 0){
+    current--;
+    loadStop(current);
+    const prevPhases = getPhaseList(current);
+    renderPhase(prevPhases[prevPhases.length - 1]);
+  }
+}
+
+// Lets the step buttons work even before the bottle has been tapped —
+// they only drive the letter/password UI, not real geolocation, so no
+// permission prompts are needed for this.
+function ensureJourneyStarted(){
+  if(letterReviewScreen.style.display !== 'none' || closeLetterBtn.style.display !== 'none'){
+    hideLetterReview();
+  }
+  introScreen.style.display = 'none';
+  resumeScreen.style.display = 'none';
+  letterScreen.style.display = 'none';
+  gate.style.display = 'none';
+  startSmoothingLoop();
+}
+
+el('prevStopBtn').addEventListener('click', goToPrevStep);
+el('nextStopBtn').addEventListener('click', goToNextStep);
 
 // ---- reset journey ----
 // Reloading after clearing storage is the simplest reliable way to reset
@@ -1255,6 +1531,7 @@ el('resetJourneyBtn').addEventListener('click', ()=>{
   const saved = loadSavedProgress();
   if(saved){
     current = saved.current;
+    lastLetter = saved.lastLetter;
     introScreen.style.display = 'none';
     resumeScreen.style.display = '';
   }
