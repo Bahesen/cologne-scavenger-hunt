@@ -3,9 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="color-scheme" content="light">
 <title>HIERONYMUS TAGEBUCH</title>
 <style>
   :root{
+    color-scheme: light;
     --wood-dark:#160f09;
     --wood-mid:#2b1d12;
     --wood-light:#3a2818;
@@ -364,9 +366,17 @@
   }
   .play-track{
     flex:1;
+    height:24px;
+    display:flex;
+    align-items:center;
+    cursor:pointer;
+    touch-action:none;
+  }
+  .play-track .line{
+    position:relative;
+    width:100%;
     height:2px;
     background:rgba(63,107,92,0.25);
-    position:relative;
     border-radius:2px;
   }
   .play-track .fill{
@@ -374,6 +384,17 @@
     width:0%;
     background:var(--verdigris);
     border-radius:2px;
+  }
+  .play-track .handle{
+    position:absolute;
+    top:50%;
+    left:0%;
+    width:16px; height:16px;
+    border-radius:50%;
+    background:var(--verdigris);
+    border:2px solid var(--parchment);
+    transform:translate(-50%,-50%);
+    box-shadow:0 1px 2px rgba(0,0,0,0.35);
   }
 
   /* ---- test drawer ---- */
@@ -472,7 +493,12 @@ Bei einem Spiel aus Schlag und Ball und Loch, lernte ich die hiesigen Gebräuche
     </div>
     <div class="play-row">
       <button class="play-btn" id="introPlayBtn">▶</button>
-      <div class="play-track"><div class="fill" id="introPlayFill"></div></div>
+      <div class="play-track" id="introPlayTrack">
+        <div class="line">
+          <div class="fill" id="introPlayFill"></div>
+          <div class="handle" id="introPlayHandle"></div>
+        </div>
+      </div>
     </div>
     <button class="primary" id="beginBtn">Die Reise beginnt</button>
     <button class="ghost" id="closeLetterBtn" style="display:none;">Zurück zum Kompass</button>
@@ -543,7 +569,12 @@ Bei einem Spiel aus Schlag und Ball und Loch, lernte ich die hiesigen Gebräuche
     <div class="msg" id="arrivalMsg"></div>
     <div class="play-row">
       <button class="play-btn" id="playBtn">▶</button>
-      <div class="play-track"><div class="fill" id="playFill"></div></div>
+      <div class="play-track" id="playTrack">
+        <div class="line">
+          <div class="fill" id="playFill"></div>
+          <div class="handle" id="playHandle"></div>
+        </div>
+      </div>
     </div>
     <button class="primary" id="nextBtn">Chart the next course</button>
     <div class="error-msg" id="playErrBox" style="display:none;"></div>
@@ -630,7 +661,7 @@ const STOPS = [
 ];
 /* ============================================================ */
 
-const APP_VERSION = "1.7.0";
+const APP_VERSION = "1.8.0";
 
 let current = 0;
 let rawPos = null;       // {lat, lng} straight from the GPS
@@ -650,6 +681,8 @@ const bottleBtn = el('bottleBtn');
 const letterScreen = el('letterScreen');
 const introPlayBtn = el('introPlayBtn');
 const introPlayFill = el('introPlayFill');
+const introPlayTrack = el('introPlayTrack');
+const introPlayHandle = el('introPlayHandle');
 const beginBtn = el('beginBtn');
 const closeLetterBtn = el('closeLetterBtn');
 const reopenLetterBtn = el('reopenLetterBtn');
@@ -669,6 +702,8 @@ const arrivalMsg = el('arrivalMsg');
 const nextBtn = el('nextBtn');
 const playBtn = el('playBtn');
 const playFill = el('playFill');
+const playTrack = el('playTrack');
+const playHandle = el('playHandle');
 const doneScreen = el('doneScreen');
 const dialWrap = el('dialWrap');
 
@@ -819,6 +854,7 @@ arrivalLetterBtn.addEventListener('click', ()=>{
   arrivalMsg.textContent = s.message;
   arrivalPanel.classList.add('show');
   playFill.style.width = '0%';
+  playHandle.style.left = '0%';
   playBtn.textContent = '▶';
   playErrBox.style.display = 'none';
   if(s.audioSrc){
@@ -827,6 +863,26 @@ arrivalLetterBtn.addEventListener('click', ()=>{
     speakFallback(s.message);
   }
 });
+
+// ---- draggable seek handle for both audio players ----
+function setupSeekableTrack(trackEl, handleEl, fillEl, getAudioEl){
+  function seekToClientX(clientX){
+    const audio = getAudioEl();
+    if(!audio || !audio.duration || !isFinite(audio.duration)) return;
+    const rect = trackEl.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    audio.currentTime = ratio * audio.duration;
+    fillEl.style.width = `${ratio*100}%`;
+    handleEl.style.left = `${ratio*100}%`;
+  }
+  let dragging = false;
+  trackEl.addEventListener('pointerdown', (e)=>{ dragging = true; seekToClientX(e.clientX); });
+  handleEl.addEventListener('pointerdown', (e)=>{ e.stopPropagation(); dragging = true; });
+  window.addEventListener('pointermove', (e)=>{ if(dragging) seekToClientX(e.clientX); });
+  window.addEventListener('pointerup', ()=>{ dragging = false; });
+}
+setupSeekableTrack(introPlayTrack, introPlayHandle, introPlayFill, ()=>introAudioEl);
+setupSeekableTrack(playTrack, playHandle, playFill, ()=>audioEl);
 
 // ---- audio playback with speech-synthesis fallback ----
 let audioEl = null;
@@ -851,9 +907,13 @@ function playAudioFile(s){
   audioEl = new Audio(s.audioSrc);
   audioEl.preload = 'auto';
   audioEl.ontimeupdate = ()=>{
-    if(audioEl.duration) playFill.style.width = `${(audioEl.currentTime/audioEl.duration)*100}%`;
+    if(audioEl.duration){
+      const pct = (audioEl.currentTime/audioEl.duration)*100;
+      playFill.style.width = `${pct}%`;
+      playHandle.style.left = `${pct}%`;
+    }
   };
-  audioEl.onended = ()=>{ playBtn.textContent='▶'; playFill.style.width='100%'; };
+  audioEl.onended = ()=>{ playBtn.textContent='▶'; playFill.style.width='100%'; playHandle.style.left='100%'; };
   audioEl.onerror = ()=>{ handleAudioFailure(s); };
   const playPromise = audioEl.play();
   if(playPromise && typeof playPromise.then === 'function'){
@@ -879,7 +939,7 @@ function speakFallback(text){
   playBtn.textContent = '❚❚';
   const u = new SpeechSynthesisUtterance(text);
   u.lang = 'en-GB';
-  u.onend = ()=>{ speaking=false; playBtn.textContent='▶'; playFill.style.width='100%'; };
+  u.onend = ()=>{ speaking=false; playBtn.textContent='▶'; playFill.style.width='100%'; playHandle.style.left='100%'; };
   window.speechSynthesis.speak(u);
 }
 
@@ -1040,9 +1100,13 @@ let introAudioEl = null;
 function setupIntroAudio(){
   introAudioEl = new Audio('audio/intro.mp3');
   introAudioEl.ontimeupdate = ()=>{
-    if(introAudioEl.duration) introPlayFill.style.width = `${(introAudioEl.currentTime/introAudioEl.duration)*100}%`;
+    if(introAudioEl.duration){
+      const pct = (introAudioEl.currentTime/introAudioEl.duration)*100;
+      introPlayFill.style.width = `${pct}%`;
+      introPlayHandle.style.left = `${pct}%`;
+    }
   };
-  introAudioEl.onended = ()=>{ introPlayBtn.textContent='▶'; introPlayFill.style.width='100%'; };
+  introAudioEl.onended = ()=>{ introPlayBtn.textContent='▶'; introPlayFill.style.width='100%'; introPlayHandle.style.left='100%'; };
   const p = introAudioEl.play();
   if(p && typeof p.then === 'function'){
     p.then(()=>{ introPlayBtn.textContent='❚❚'; }).catch(()=>{ introPlayBtn.textContent='▶'; });
