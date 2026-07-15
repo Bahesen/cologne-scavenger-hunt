@@ -141,6 +141,28 @@
     margin-top:18px;
   }
 
+  /* ---- letter icon (reopen button + arrival prompt) ---- */
+  .letter-icon-btn{
+    background:none;
+    border:none;
+    padding:8px;
+    cursor:pointer;
+    opacity:0.85;
+    animation: bob 3.4s ease-in-out infinite;
+  }
+  .letter-icon-btn:active{ transform: scale(0.94); }
+  #reopenLetterBtn{
+    margin:14px auto 0;
+    display:block;
+  }
+  .arrival-letter{
+    margin-top:auto;
+    padding-top:24px;
+    flex-direction:column;
+    align-items:center;
+    gap:14px;
+  }
+
   /* ---- status bar ---- */
   .status{
     display:flex;
@@ -453,6 +475,7 @@ Bei einem Spiel aus Schlag und Ball und Loch, lernte ich die hiesigen Gebräuche
       <div class="play-track"><div class="fill" id="introPlayFill"></div></div>
     </div>
     <button class="primary" id="beginBtn">Die Reise beginnt</button>
+    <button class="ghost" id="closeLetterBtn" style="display:none;">Zurück zum Kompass</button>
   </div>
 
   <div class="status" id="statusBar">
@@ -492,12 +515,31 @@ Bei einem Spiel aus Schlag und Ball und Loch, lernte ich die hiesigen Gebräuche
     <div class="hint" id="hintOut">Ich suche dich…</div>
   </div>
 
+  <button class="letter-icon-btn" id="reopenLetterBtn" aria-label="Brief erneut öffnen" style="display:none;">
+    <svg viewBox="0 0 140 100" width="46" height="33">
+      <rect x="6" y="10" width="128" height="84" rx="4" fill="#EFE0B3" stroke="#2E1D0E" stroke-width="3"/>
+      <path d="M6,14 L70,60 L134,14" fill="none" stroke="#2E1D0E" stroke-width="3" stroke-linejoin="round"/>
+      <circle cx="70" cy="60" r="12" fill="#7A2E2E" stroke="#2E1D0E" stroke-width="1.5"/>
+    </svg>
+  </button>
+
   <div class="gate" id="gate" style="display:none;">
     <button class="primary" id="startBtn">HÖRE MEINE WORTE...</button>
   </div>
 
+  <div class="arrival-letter" id="arrivalLetterPrompt" style="display:none;">
+    <button class="letter-icon-btn" id="arrivalLetterBtn" aria-label="Brief öffnen">
+      <svg viewBox="0 0 140 100" width="110" height="78">
+        <rect x="6" y="10" width="128" height="84" rx="4" fill="#EFE0B3" stroke="#2E1D0E" stroke-width="3"/>
+        <path d="M6,14 L70,60 L134,14" fill="none" stroke="#2E1D0E" stroke-width="3" stroke-linejoin="round"/>
+        <circle cx="70" cy="60" r="12" fill="#7A2E2E" stroke="#2E1D0E" stroke-width="1.5"/>
+      </svg>
+    </button>
+    <p class="intro-hint">Ein Brief wartet auf Dich</p>
+  </div>
+
   <div class="arrival" id="arrivalPanel">
-    <div class="tag">X marks the spot</div>
+
     <div class="msg" id="arrivalMsg"></div>
     <div class="play-row">
       <button class="play-btn" id="playBtn">▶</button>
@@ -554,41 +596,41 @@ Bei einem Spiel aus Schlag und Ball und Loch, lernte ich die hiesigen Gebräuche
    ============================================================ */
 const STOPS = [
   {
-    name: "Kölner Dom",
-    lat: 50.9413,
-    lng: 6.9583,
-    radius: 40,
+    name: "Beautee Bubble Tea",
+    lat: 50.93697575860792, 
+    lng: 6.940338382672812,
+    radius: 10,
     audioSrc: "audio/stop1.mp3",
-    message: "You made it to the cathedral. Look up at the north tower — count the gargoyles and text me the number."
+    message: "Ich habe einen Bubble Tea getrunken. Der war sehr schmackhaft."
   },
   {
-    name: "Hohenzollernbrücke",
-    lat: 50.9427,
-    lng: 6.9603,
-    radius: 40,
+    name: "Hahentor",
+    lat: 50.93643547752539, 
+    lng: 6.940158623883777,
+    radius: 5,
     audioSrc: "audio/stop2.mp3",
-    message: "The bridge of locks. Find the oldest-looking padlock you can and take a photo of it."
+    message: "800 Jahre alte Geschichte ist hier greifbar."
   },
   {
-    name: "4711 Duftbrunnen",
-    lat: 50.9369,
-    lng: 6.9586,
-    radius: 30,
+    name: "Giga Center",
+    lat: 50.936915925793876, 
+    lng: 6.938837950384127,
+    radius: 10,
     audioSrc: "audio/stop3.mp3",
-    message: "You're at the fragrance fountain. Someone in your group has to describe Cologne's smell to a stranger nearby."
+    message: "Hier wird gespielt und gelacht."
   },
   {
-    name: "Schokoladenmuseum",
-    lat: 50.9296,
-    lng: 6.9662,
-    radius: 40,
+    name: "Lecker",
+    lat: 50.93864224391797, 
+    lng: 6.940703365241949,
+    radius: 5,
     audioSrc: "audio/stop4.mp3",
-    message: "Last stop: the chocolate museum. Trade something small with a stranger — anything at all — and bring it back."
+    message: "Es ist Zeit zu Essen, meine Lieben."
   }
 ];
 /* ============================================================ */
 
-const APP_VERSION = "1.5.1";
+const APP_VERSION = "1.7.0";
 
 let current = 0;
 let rawPos = null;       // {lat, lng} straight from the GPS
@@ -609,6 +651,10 @@ const letterScreen = el('letterScreen');
 const introPlayBtn = el('introPlayBtn');
 const introPlayFill = el('introPlayFill');
 const beginBtn = el('beginBtn');
+const closeLetterBtn = el('closeLetterBtn');
+const reopenLetterBtn = el('reopenLetterBtn');
+const arrivalLetterPrompt = el('arrivalLetterPrompt');
+const arrivalLetterBtn = el('arrivalLetterBtn');
 const stopNameEl = el('stopName');
 const stopCountEl = el('stopCount');
 const distanceOut = el('distanceOut');
@@ -703,6 +749,8 @@ function bearingDeg(lat1,lon1,lat2,lon2){
 function loadStop(i){
   arrived = false;
   arrivalPanel.classList.remove('show');
+  arrivalLetterPrompt.style.display = 'none';
+  reopenLetterBtn.style.display = '';
   doneScreen.style.display = 'none';
   dialWrap.style.display = '';
   document.querySelector('.readout').style.display='';
@@ -716,6 +764,8 @@ function loadStop(i){
 function finishTrail(){
   dialWrap.style.display = 'none';
   document.querySelector('.readout').style.display='none';
+  reopenLetterBtn.style.display = 'none';
+  arrivalLetterPrompt.style.display = 'none';
   arrivalPanel.classList.remove('show');
   doneScreen.style.display = 'block';
   stopNameEl.textContent = "—";
@@ -748,15 +798,35 @@ function updateDial(){
   }
 }
 
+function playSuccessSound(){
+  try{
+    const sfx = new Audio('audio/success.mp3');
+    sfx.play().catch(()=>{});
+  }catch(e){}
+}
+
 function triggerArrival(){
   arrived = true;
+  reopenLetterBtn.style.display = 'none';
+  arrivalLetterPrompt.style.display = 'flex';
+  if(navigator.vibrate) navigator.vibrate([80,40,80]);
+  playSuccessSound();
+}
+
+arrivalLetterBtn.addEventListener('click', ()=>{
+  arrivalLetterPrompt.style.display = 'none';
   const s = STOPS[current];
   arrivalMsg.textContent = s.message;
   arrivalPanel.classList.add('show');
   playFill.style.width = '0%';
   playBtn.textContent = '▶';
-  if(navigator.vibrate) navigator.vibrate([80,40,80]);
-}
+  playErrBox.style.display = 'none';
+  if(s.audioSrc){
+    playAudioFile(s); // this click is the direct user gesture, so autoplay is allowed
+  } else {
+    speakFallback(s.message);
+  }
+});
 
 // ---- audio playback with speech-synthesis fallback ----
 let audioEl = null;
@@ -997,9 +1067,36 @@ bottleBtn.addEventListener('click', ()=>{
 });
 
 beginBtn.addEventListener('click', ()=>{
+  if(introAudioEl){ introAudioEl.pause(); }
+  playSuccessSound();
   letterScreen.style.display = 'none';
   requestPermissionsAndStart();
 });
+
+// ---- reopening the letter mid-trail ----
+// This is a read-only replay, not the onboarding flow — it must not
+// call requestPermissionsAndStart() again (that would open a second
+// geolocation watch and re-request permissions unnecessarily).
+function showLetterReview(){
+  document.querySelector('.status').style.display = 'none';
+  dialWrap.style.display = 'none';
+  document.querySelector('.readout').style.display = 'none';
+  reopenLetterBtn.style.display = 'none';
+  beginBtn.style.display = 'none';
+  closeLetterBtn.style.display = '';
+  letterScreen.style.display = '';
+}
+function hideLetterReview(){
+  letterScreen.style.display = 'none';
+  beginBtn.style.display = '';
+  closeLetterBtn.style.display = 'none';
+  document.querySelector('.status').style.display = '';
+  dialWrap.style.display = '';
+  document.querySelector('.readout').style.display = '';
+  reopenLetterBtn.style.display = '';
+}
+reopenLetterBtn.addEventListener('click', showLetterReview);
+closeLetterBtn.addEventListener('click', hideLetterReview);
 
 // ---- test mode (for previewing without real GPS/compass) ----
 el('simToggle').addEventListener('click', ()=>{
