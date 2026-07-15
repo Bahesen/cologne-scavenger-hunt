@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Cologne Field Trail</title>
+<style>
+  :root{
+    --ink:#101528;
+    --ink-2:#161c33;
+    --paper:#EDEAE2;
+    --paper-dim:#b9b6ac;
+    --brass:#D6A34A;
+    --brass-dim:#8a6f37;
+    --teal:#5C7285;
+    --ok:#7FA37F;
+    --danger:#c96a4e;
+    --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    min-height:100vh;
+    background:
+      radial-gradient(ellipse at 50% -10%, #1c2340 0%, var(--ink) 55%),
+      var(--ink);
+    color:var(--paper);
+    font-family:var(--sans);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    overflow-x:hidden;
+  }
+
+  .frame{
+    width:100%;
+    max-width:480px;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    padding:18px 20px 28px;
+  }
+
+  /* ---- status bar ---- */
+  .status{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    padding-bottom:14px;
+    border-bottom:1px solid rgba(237,234,226,0.12);
+  }
+  .status .eyebrow{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:0.14em;
+    color:var(--brass);
+    text-transform:uppercase;
+  }
+  .status .stopname{
+    font-size:19px;
+    font-weight:600;
+    margin-top:4px;
+    letter-spacing:-0.01em;
+  }
+  .status .count{
+    font-family:var(--mono);
+    font-size:13px;
+    color:var(--paper-dim);
+  }
+
+  /* ---- compass dial ---- */
+  .dial-wrap{
+    position:relative;
+    margin:38px auto 6px;
+    width:min(78vw, 300px);
+    height:min(78vw, 300px);
+  }
+  svg.dial-face{
+    position:absolute; inset:0;
+    width:100%; height:100%;
+  }
+  .needle{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    transition: transform 0.25s ease-out;
+    will-change: transform;
+  }
+  .needle svg{width:100%;height:100%;display:block;}
+
+  .dial-center{
+    position:absolute;
+    top:50%; left:50%;
+    transform:translate(-50%,-50%);
+    width:14px; height:14px;
+    border-radius:50%;
+    background:var(--brass);
+    box-shadow:0 0 0 4px var(--ink), 0 0 14px rgba(214,163,74,0.6);
+  }
+
+  .readout{
+    text-align:center;
+    margin-top:10px;
+  }
+  .readout .distance{
+    font-family:var(--mono);
+    font-size:38px;
+    font-weight:600;
+    letter-spacing:-0.02em;
+    color:var(--paper);
+  }
+  .readout .distance small{
+    font-size:16px;
+    color:var(--paper-dim);
+    font-weight:400;
+  }
+  .readout .hint{
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--teal);
+    margin-top:6px;
+    min-height:16px;
+  }
+
+  /* ---- start / permission gate ---- */
+  .gate{
+    margin-top:auto;
+    padding-top:24px;
+  }
+  .gate p{
+    font-size:14px;
+    line-height:1.5;
+    color:var(--paper-dim);
+    margin:0 0 16px;
+  }
+
+  button.primary{
+    width:100%;
+    padding:16px;
+    border:none;
+    border-radius:2px;
+    background:var(--brass);
+    color:var(--ink);
+    font-size:15px;
+    font-weight:700;
+    letter-spacing:0.02em;
+    cursor:pointer;
+  }
+  button.primary:active{background:var(--brass-dim);}
+  button.ghost{
+    width:100%;
+    padding:14px;
+    margin-top:10px;
+    border:1px solid rgba(237,234,226,0.25);
+    border-radius:2px;
+    background:transparent;
+    color:var(--paper);
+    font-size:13px;
+    cursor:pointer;
+    font-family:var(--mono);
+  }
+
+  .error-msg{
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--danger);
+    margin-top:10px;
+    line-height:1.5;
+  }
+
+  /* ---- arrival panel ---- */
+  .arrival{
+    margin-top:auto;
+    padding-top:22px;
+    border-top:1px solid rgba(127,163,127,0.35);
+    display:none;
+  }
+  .arrival.show{display:block;}
+  .arrival .tag{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:0.14em;
+    color:var(--ok);
+    text-transform:uppercase;
+  }
+  .arrival .msg{
+    font-size:15px;
+    line-height:1.55;
+    margin:10px 0 16px;
+    color:var(--paper);
+  }
+  .play-row{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    margin-bottom:16px;
+  }
+  .play-btn{
+    width:52px;height:52px;
+    flex:none;
+    border-radius:50%;
+    border:2px solid var(--ok);
+    background:transparent;
+    color:var(--ok);
+    font-size:18px;
+    cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .play-track{
+    flex:1;
+    height:2px;
+    background:rgba(127,163,127,0.25);
+    position:relative;
+    border-radius:2px;
+  }
+  .play-track .fill{
+    position:absolute; left:0; top:0; bottom:0;
+    width:0%;
+    background:var(--ok);
+    border-radius:2px;
+  }
+
+  /* ---- test drawer ---- */
+  .testdrawer{
+    margin-top:16px;
+    border-top:1px dashed rgba(237,234,226,0.15);
+    padding-top:12px;
+  }
+  .testdrawer summary{
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--paper-dim);
+    cursor:pointer;
+  }
+  .testdrawer .row{
+    display:flex;
+    gap:8px;
+    margin-top:10px;
+  }
+  .testdrawer input[type=number]{
+    width:100%;
+    background:var(--ink-2);
+    border:1px solid rgba(237,234,226,0.15);
+    color:var(--paper);
+    font-family:var(--mono);
+    font-size:12px;
+    padding:8px;
+    border-radius:2px;
+  }
+  .testdrawer label{
+    font-family:var(--mono);
+    font-size:10px;
+    color:var(--paper-dim);
+    display:block;
+    margin-bottom:4px;
+  }
+  .testdrawer .row2{margin-top:8px;}
+
+  .done{
+    text-align:center;
+    margin-top:auto;
+    padding-top:60px;
+  }
+  .done h1{
+    font-size:26px;
+    margin-bottom:10px;
+  }
+  .done p{
+    color:var(--paper-dim);
+    font-size:14px;
+  }
+</style>
+</head>
+<body>
+
+<div class="frame" id="frame">
+
+  <div class="status">
+    <div>
+      <div class="eyebrow">Cologne Field Trail</div>
+      <div class="stopname" id="stopName">—</div>
+    </div>
+    <div class="count" id="stopCount">0 / 0</div>
+  </div>
+
+  <div class="dial-wrap" id="dialWrap">
+    <svg class="dial-face" viewBox="0 0 300 300">
+      <circle cx="150" cy="150" r="140" fill="none" stroke="rgba(237,234,226,0.15)" stroke-width="1"/>
+      <circle cx="150" cy="150" r="112" fill="none" stroke="rgba(237,234,226,0.08)" stroke-width="1"/>
+      <g id="ticks"></g>
+      <text x="150" y="30" text-anchor="middle" fill="#8a6f37" font-family="SFMono-Regular,Consolas,monospace" font-size="13" letter-spacing="2">N</text>
+      <text x="270" y="155" text-anchor="middle" fill="rgba(237,234,226,0.35)" font-family="SFMono-Regular,Consolas,monospace" font-size="12">E</text>
+      <text x="150" y="278" text-anchor="middle" fill="rgba(237,234,226,0.35)" font-family="SFMono-Regular,Consolas,monospace" font-size="12">S</text>
+      <text x="30" y="155" text-anchor="middle" fill="rgba(237,234,226,0.35)" font-family="SFMono-Regular,Consolas,monospace" font-size="12">W</text>
+    </svg>
+    <div class="needle" id="needle">
+      <svg viewBox="0 0 300 300">
+        <polygon points="150,38 162,150 150,140 138,150" fill="#D6A34A"/>
+        <polygon points="150,262 162,150 150,160 138,150" fill="#5C7285"/>
+      </svg>
+    </div>
+    <div class="dial-center"></div>
+  </div>
+
+  <div class="readout">
+    <div class="distance" id="distanceOut">— <small>m</small></div>
+    <div class="hint" id="hintOut">waiting for position…</div>
+  </div>
+
+  <div class="gate" id="gate">
+    <p>Uses your phone's GPS and compass to point toward each stop. Tap start and allow location + motion access when your browser asks.</p>
+    <button class="primary" id="startBtn">Start the trail</button>
+    <div class="error-msg" id="errBox" style="display:none;"></div>
+  </div>
+
+  <div class="arrival" id="arrivalPanel">
+    <div class="tag">You've arrived</div>
+    <div class="msg" id="arrivalMsg"></div>
+    <div class="play-row">
+      <button class="play-btn" id="playBtn">▶</button>
+      <div class="play-track"><div class="fill" id="playFill"></div></div>
+    </div>
+    <button class="primary" id="nextBtn">Continue to next stop</button>
+  </div>
+
+  <div class="done" id="doneScreen" style="display:none;">
+    <h1>Trail complete</h1>
+    <p>Everyone made it. Nicely done.</p>
+  </div>
+
+  <details class="testdrawer">
+    <summary>Test mode (no real GPS needed)</summary>
+    <div class="row">
+      <div style="flex:1">
+        <label>Simulated latitude</label>
+        <input type="number" id="simLat" step="0.00001" placeholder="50.9413">
+      </div>
+      <div style="flex:1">
+        <label>Simulated longitude</label>
+        <input type="number" id="simLng" step="0.00001" placeholder="6.9583">
+      </div>
+    </div>
+    <div class="row row2">
+      <div style="flex:1">
+        <label>Simulated heading (0–360°)</label>
+        <input type="number" id="simHeading" step="1" placeholder="0">
+      </div>
+    </div>
+    <button class="ghost" id="simApply">Apply simulated position</button>
+    <button class="ghost" id="simToggle">Enable test mode</button>
+  </details>
+
+</div>
+
+<script>
+/* ============================================================
+   EDIT THIS LIST — one entry per stop.
+   lat/lng: the target coordinates (right-click a spot on
+            Google Maps -> the numbers are your lat, lng).
+   radius:  meters — how close counts as "arrived".
+   audioSrc: filename of a voice recording placed in the SAME
+             folder as this HTML file (e.g. "stop1.mp3").
+             Leave as "" to have the message read aloud instead.
+   message: shown as text always, and used as the spoken
+            fallback if audioSrc is missing or fails to load.
+   ============================================================ */
+const STOPS = [
+  {
+    name: "Hahnentor",
+    lat: 50.936506,
+    lng:  6.940034,
+    radius: 50,
+    audioSrc: "audio/stop1.mp3",
+    message: "Das tolle Hahnentor. Finde heraus wie alt es ist und tippe die richtige Zahl ein."
+  },
+  {
+    name: "Hohenzollernbrücke",
+    lat: 50.9427,
+    lng: 6.9603,
+    radius: 40,
+    audioSrc: "audio/stop2.mp3",
+    message: "The bridge of locks. Find the oldest-looking padlock you can and take a photo of it."
+  },
+  {
+    name: "4711 Duftbrunnen",
+    lat: 50.9369,
+    lng: 6.9586,
+    radius: 30,
+    audioSrc: "audio/stop3.mp3",
+    message: "You're at the fragrance fountain. Someone in your group has to describe Cologne's smell to a stranger nearby."
+  },
+  {
+    name: "Schokoladenmuseum",
+    lat: 50.9296,
+    lng: 6.9662,
+    radius: 40,
+    audioSrc: "audio/stop4.mp3",
+    message: "Last stop: the chocolate museum. Trade something small with a stranger — anything at all — and bring it back."
+  }
+];
+/* ============================================================ */
+
+let current = 0;
+let userPos = null;      // {lat, lng}
+let heading = null;      // degrees, 0 = north
+let watchId = null;
+let arrived = false;
+let testMode = false;
+let orientationHandlerAttached = false;
+
+const el = id => document.getElementById(id);
+const stopNameEl = el('stopName');
+const stopCountEl = el('stopCount');
+const distanceOut = el('distanceOut');
+const hintOut = el('hintOut');
+const needle = el('needle');
+const gate = el('gate');
+const startBtn = el('startBtn');
+const errBox = el('errBox');
+const arrivalPanel = el('arrivalPanel');
+const arrivalMsg = el('arrivalMsg');
+const nextBtn = el('nextBtn');
+const playBtn = el('playBtn');
+const playFill = el('playFill');
+const doneScreen = el('doneScreen');
+const dialWrap = el('dialWrap');
+
+// draw 24 tick marks
+(function drawTicks(){
+  const g = el('ticks');
+  for(let i=0;i<24;i++){
+    const angle = (i*15) * Math.PI/180;
+    const r1 = 128, r2 = (i%6===0)?112:120;
+    const x1 = 150+r1*Math.sin(angle), y1 = 150-r1*Math.cos(angle);
+    const x2 = 150+r2*Math.sin(angle), y2 = 150-r2*Math.cos(angle);
+    const line = document.createElementNS("http://www.w3.org/2000/svg","line");
+    line.setAttribute("x1",x1); line.setAttribute("y1",y1);
+    line.setAttribute("x2",x2); line.setAttribute("y2",y2);
+    line.setAttribute("stroke", i%6===0 ? "rgba(214,163,74,0.5)" : "rgba(237,234,226,0.15)");
+    line.setAttribute("stroke-width", i%6===0 ? "2" : "1");
+    g.appendChild(line);
+  }
+})();
+
+function toRad(d){return d*Math.PI/180;}
+function toDeg(r){return r*180/Math.PI;}
+
+function haversineMeters(lat1,lon1,lat2,lon2){
+  const R = 6371000;
+  const dLat = toRad(lat2-lat1);
+  const dLon = toRad(lon2-lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+
+function bearingDeg(lat1,lon1,lat2,lon2){
+  const y = Math.sin(toRad(lon2-lon1))*Math.cos(toRad(lat2));
+  const x = Math.cos(toRad(lat1))*Math.sin(toRad(lat2)) -
+            Math.sin(toRad(lat1))*Math.cos(toRad(lat2))*Math.cos(toRad(lon2-lon1));
+  return (toDeg(Math.atan2(y,x))+360)%360;
+}
+
+function loadStop(i){
+  arrived = false;
+  arrivalPanel.classList.remove('show');
+  doneScreen.style.display = 'none';
+  dialWrap.style.display = '';
+  document.querySelector('.readout').style.display='';
+  const s = STOPS[i];
+  stopNameEl.textContent = s.name;
+  stopCountEl.textContent = `${i+1} / ${STOPS.length}`;
+  hintOut.textContent = 'walk toward the arrow';
+}
+
+function finishTrail(){
+  dialWrap.style.display = 'none';
+  document.querySelector('.readout').style.display='none';
+  arrivalPanel.classList.remove('show');
+  doneScreen.style.display = 'block';
+  stopNameEl.textContent = "—";
+  stopCountEl.textContent = `${STOPS.length} / ${STOPS.length}`;
+  if(watchId!==null) navigator.geolocation.clearWatch(watchId);
+}
+
+function updateDial(){
+  if(!userPos) return;
+  const target = STOPS[current];
+  const dist = haversineMeters(userPos.lat, userPos.lng, target.lat, target.lng);
+  distanceOut.innerHTML = dist < 1000
+    ? `${Math.round(dist)} <small>m</small>`
+    : `${(dist/1000).toFixed(2)} <small>km</small>`;
+
+  if(heading!==null){
+    const brg = bearingDeg(userPos.lat, userPos.lng, target.lat, target.lng);
+    const rot = (brg - heading + 360) % 360;
+    needle.style.transform = `rotate(${rot}deg)`;
+    hintOut.textContent = dist <= target.radius ? '' : 'walk toward the arrow';
+  } else {
+    hintOut.textContent = 'point your phone flat to calibrate compass';
+  }
+
+  if(!arrived && dist <= target.radius){
+    triggerArrival();
+  }
+}
+
+function triggerArrival(){
+  arrived = true;
+  const s = STOPS[current];
+  arrivalMsg.textContent = s.message;
+  arrivalPanel.classList.add('show');
+  playFill.style.width = '0%';
+  playBtn.textContent = '▶';
+  if(navigator.vibrate) navigator.vibrate([80,40,80]);
+}
+
+// ---- audio playback with speech-synthesis fallback ----
+let audioEl = null;
+let speaking = false;
+
+playBtn.addEventListener('click', ()=>{
+  const s = STOPS[current];
+  if(speaking){ window.speechSynthesis.cancel(); speaking=false; playBtn.textContent='▶'; return; }
+  if(audioEl && !audioEl.paused){ audioEl.pause(); playBtn.textContent='▶'; return; }
+
+  if(s.audioSrc){
+    audioEl = new Audio(s.audioSrc);
+    audioEl.ontimeupdate = ()=>{
+      playFill.style.width = `${(audioEl.currentTime/audioEl.duration)*100}%`;
+    };
+    audioEl.onended = ()=>{ playBtn.textContent='▶'; playFill.style.width='100%'; };
+    audioEl.onerror = ()=>{ speakFallback(s.message); };
+    audioEl.play().then(()=>{ playBtn.textContent='❚❚'; }).catch(()=> speakFallback(s.message));
+  } else {
+    speakFallback(s.message);
+  }
+});
+
+function speakFallback(text){
+  if(!('speechSynthesis' in window)){
+    errBox.style.display='block';
+   // errBox.textContent = 'No audio file found and this browser can\\'t read text aloud. The message is shown above.';
+    return;
+  }
+  speaking = true;
+  playBtn.textContent = '❚❚';
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'en-GB';
+  u.onend = ()=>{ speaking=false; playBtn.textContent='▶'; playFill.style.width='100%'; };
+  window.speechSynthesis.speak(u);
+}
+
+nextBtn.addEventListener('click', ()=>{
+  if(audioEl){ audioEl.pause(); }
+  window.speechSynthesis.cancel();
+  current++;
+  if(current >= STOPS.length){ finishTrail(); }
+  else { loadStop(current); updateDial(); }
+});
+
+// ---- geolocation ----
+function startGeolocation(){
+  if(!('geolocation' in navigator)){
+    showError('This browser has no geolocation support.');
+    return;
+  }
+  watchId = navigator.geolocation.watchPosition(pos=>{
+    userPos = {lat: pos.coords.latitude, lng: pos.coords.longitude};
+    updateDial();
+  }, err=>{
+    showError('Location access failed: ' + err.message + '. Check that location is allowed for this page in your browser settings.');
+  }, { enableHighAccuracy:true, maximumAge:2000, timeout:15000 });
+}
+
+// ---- device orientation / compass ----
+function attachOrientation(){
+  if(orientationHandlerAttached) return;
+  orientationHandlerAttached = true;
+  function handler(e){
+    let h = null;
+    if(typeof e.webkitCompassHeading === 'number'){
+      h = e.webkitCompassHeading; // iOS: already true/magnetic heading
+    } else if(e.alpha !== null && e.absolute){
+      h = 360 - e.alpha;
+    } else if(e.alpha !== null){
+      h = 360 - e.alpha; // best effort on Android without 'absolute'
+    }
+    if(h !== null){ heading = (h+360)%360; updateDial(); }
+  }
+  window.addEventListener('deviceorientationabsolute', handler, true);
+  window.addEventListener('deviceorientation', handler, true);
+}
+
+function showError(msg){
+  errBox.style.display = 'block';
+  errBox.textContent = msg;
+}
+
+async function requestPermissionsAndStart(){
+  errBox.style.display = 'none';
+  try{
+    if(typeof DeviceOrientationEvent !== 'undefined' &&
+       typeof DeviceOrientationEvent.requestPermission === 'function'){
+      const res = await DeviceOrientationEvent.requestPermission();
+      if(res !== 'granted'){
+        showError('Motion/compass access was denied. You can still use test mode below.');
+      }
+    }
+  }catch(e){
+    showError('Could not request compass permission: ' + e.message);
+  }
+  attachOrientation();
+  startGeolocation();
+  gate.style.display = 'none';
+  loadStop(current);
+}
+
+startBtn.addEventListener('click', requestPermissionsAndStart);
+
+// ---- test mode (for previewing without real GPS/compass) ----
+el('simToggle').addEventListener('click', ()=>{
+  testMode = !testMode;
+  el('simToggle').textContent = testMode ? 'Disable test mode' : 'Enable test mode';
+  if(testMode){
+    gate.style.display = 'none';
+    loadStop(current);
+  }
+});
+el('simApply').addEventListener('click', ()=>{
+  const lat = parseFloat(el('simLat').value);
+  const lng = parseFloat(el('simLng').value);
+  const hd = parseFloat(el('simHeading').value);
+  if(!isNaN(lat) && !isNaN(lng)){ userPos = {lat, lng}; }
+  if(!isNaN(hd)){ heading = ((hd%360)+360)%360; }
+  updateDial();
+});
+</script>
+</body>
+</html>

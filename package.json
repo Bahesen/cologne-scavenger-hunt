@@ -1,0 +1,9 @@
+{
+  "name": "cologne-scavenger-hunt",
+  "version": "1.0.0",
+  "description": "GPS compass scavenger hunt through Cologne with location-triggered voice messages.",
+  "private": true,
+  "scripts": {
+    "start": "npx serve . -l 5500"
+  }
+}
