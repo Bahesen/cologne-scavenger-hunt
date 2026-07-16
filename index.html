@@ -532,7 +532,7 @@
 
   <!-- EDIT THIS: the letter text shown after the bottle is opened -->
   <div class="letter-screen" id="letterScreen" style="display:none;">
-    <div class="letter-text">
+    <div class="letter-text" id="introLetterTextWrap">
       <p>Wer auch immer diese Nachricht liest. Ich brauche eure Hilfe. Mein Name ist Hieronymus Püdelheim. Ich lief Bruch auf den Weiten des Rheins. 19 Sonnen und 19 Monde trieb ich führungslos umher, bis ich endlich auf Land stieß. Oh, ich gebeutelte Seele. Sollte ich doch kein grausiges Ende auf See finden? Nein. Dort wo wochenlang nur den Kuss von nassem Holz und seichter Gischt vernahm, dort wärmte nun Mutter Erde meine blanken Füße. Sand, Schlamm, Kies, saftiges Gras und sogar warmer Asphalt. Ich war gerettet. Doch ich hatte ich alles verloren. Nicht nur Prunk und Flodder. Auch die Gallerie meiner Vergangenheit war aus meiner Hirnrinde gestrichen. Hieronymus. Das war mein Name. Alles andere war vernebelt. Dieser Ort. der als Hodenkirchen an mein Gehör trat, stellte sich als beschaulich hinaus.</p>
       <p>Ich armer Tor irrte umher auf der Suche nach mir selbst. Was der Hodenkirchener Adel zu seien schien, bot mir seine Hilfe an. Sie teilen Brot und Spiel mit mir. Und es war mir, als wäre ich einer von ihnen.
 Bei einem Spiel aus Schlag und Ball und Loch, lernte ich die hiesigen Gebräuche.</p>
@@ -617,7 +617,7 @@ Bei einem Spiel aus Schlag und Ball und Loch, lernte ich die hiesigen Gebräuche
   </div>
 
   <div class="letter-screen" id="letterReviewScreen" style="display:none;">
-    <div class="letter-text">
+    <div class="letter-text" id="letterReviewTextWrap">
       <p id="letterReviewText"></p>
     </div>
     <div class="play-row">
@@ -795,7 +795,7 @@ In der Ferne hörte ich ein dumpfes Grummeln. So, als würde sich die Erde unter
 ];
 /* ============================================================ */
 
-const APP_VERSION = "1.16.0";
+const APP_VERSION = "1.18.0";
 
 let current = 0;
 let rawPos = null;       // {lat, lng} straight from the GPS
@@ -809,7 +809,10 @@ let testMode = false;
 let orientationHandlerAttached = false;
 let smoothLoopStarted = false;
 let letterStage = 1; // 1 = letter before the password, 2 = letter after it — resets to 1 on each new stop
-let stepPhase = 'arriving'; // used by the Previous/Next Step test buttons to simulate the whole journey
+let stepPhase = 'arriving'; // tracks where we are within the current stop (arrival, letter, password...), persisted so a resume lands in the right place
+let resumeStepPhase = null; // set only when restoring saved progress — the phase to jump to right after startup
+let wakeLock = null;
+let journeyActive = false; // true once the trail has actually started — gates the wake-lock re-acquire below
 let lastLetter = { type: 'intro' }; // or { type:'stop', stopIndex:N, stage:1|2 } — what "reopen the letter" should show
 
 const el = id => document.getElementById(id);
@@ -829,6 +832,8 @@ const arrivalLetterPrompt = el('arrivalLetterPrompt');
 const arrivalLetterBtn = el('arrivalLetterBtn');
 const letterReviewScreen = el('letterReviewScreen');
 const letterReviewText = el('letterReviewText');
+const letterReviewTextWrap = el('letterReviewTextWrap');
+const introLetterTextWrap = el('introLetterTextWrap');
 const closeReviewBtn = el('closeReviewBtn');
 const reviewPlayBtn = el('reviewPlayBtn');
 const reviewPlayFill = el('reviewPlayFill');
@@ -934,7 +939,7 @@ function bearingDeg(lat1,lon1,lat2,lon2){
 // ---- saving progress so a crash/reload doesn't lose the journey ----
 const PROGRESS_KEY = 'hieronymus_progress_v1';
 function saveProgress(){
-  try{ localStorage.setItem(PROGRESS_KEY, JSON.stringify({current, lastLetter})); }catch(e){}
+  try{ localStorage.setItem(PROGRESS_KEY, JSON.stringify({current, lastLetter, stepPhase})); }catch(e){}
 }
 function clearProgress(){
   try{ localStorage.removeItem(PROGRESS_KEY); }catch(e){}
@@ -952,6 +957,9 @@ function loadSavedProgress(){
     }
     if(data.lastLetter.type === 'stop' && data.lastLetter.stage !== 1 && data.lastLetter.stage !== 2){
       data.lastLetter.stage = 1;
+    }
+    if(!getPhaseList(data.current).includes(data.stepPhase)){
+      data.stepPhase = 'arriving';
     }
     return data;
   }catch(e){}
@@ -989,6 +997,8 @@ function finishTrail(){
   stopNameEl.textContent = "—";
   stopCountEl.textContent = `${STOPS.length} / ${STOPS.length}`;
   if(watchId!==null) navigator.geolocation.clearWatch(watchId);
+  journeyActive = false;
+  releaseWakeLock();
   clearProgress();
 }
 
@@ -1033,6 +1043,7 @@ function playPaperSound(){
 
 function triggerArrival(){
   arrived = true;
+  stepPhase = 'letter1Prompt';
   document.querySelector('.status').style.display = 'none';
   dialWrap.style.display = 'none';
   document.querySelector('.readout').style.display = 'none';
@@ -1040,14 +1051,18 @@ function triggerArrival(){
   arrivalLetterPrompt.style.display = 'flex';
   if(navigator.vibrate) navigator.vibrate([80,40,80]);
   playSuccessSound();
+  saveProgress();
 }
 
 arrivalLetterBtn.addEventListener('click', ()=>{
   arrivalLetterPrompt.style.display = 'none';
   playPaperSound();
+  stepPhase = letterStage === 1 ? 'letter1Open' : 'letter2Open';
   lastLetter = { type: 'stop', stopIndex: current, stage: letterStage };
+  saveProgress();
   const letter = letterStage === 1 ? STOPS[current].letter1 : STOPS[current].letter2;
   arrivalMsg.textContent = letter.message;
+  arrivalMsg.scrollTop = 0;
   arrivalPanel.classList.add('show');
   playFill.style.width = '0%';
   playHandle.style.left = '0%';
@@ -1086,19 +1101,33 @@ let speaking = false;
 let fallbackHandled = false; // guards against onerror AND play().catch both firing for the same failure
 
 playBtn.addEventListener('click', ()=>{
-  const s = STOPS[current];
+  const letter = letterStage === 1 ? STOPS[current].letter1 : STOPS[current].letter2;
   if(speaking){ window.speechSynthesis.cancel(); speaking=false; playBtn.textContent='▶'; return; }
   if(audioEl && !audioEl.paused){ audioEl.pause(); playBtn.textContent='▶'; return; }
+  if(audioEl && audioEl.paused && !audioEl.ended){
+    // resume the same audio object rather than recreating it
+    audioEl.play().then(()=>{ playBtn.textContent='❚❚'; }).catch(()=>{ handleAudioFailure(letter); });
+    return;
+  }
 
   playErrBox.style.display = 'none';
-  if(s.audioSrc){
-    playAudioFile(s);
+  if(letter.audioSrc){
+    playAudioFile(letter);
   } else {
-    speakFallback(s.message);
+    speakFallback(letter.message);
   }
 });
 
 function playAudioFile(s){
+  if(audioEl){
+    // stop and fully detach the previous audio before replacing it, so a
+    // stale object can't keep playing in the background or fire events
+    // onto the UI meant for the new one
+    audioEl.pause();
+    audioEl.ontimeupdate = null;
+    audioEl.onended = null;
+    audioEl.onerror = null;
+  }
   fallbackHandled = false;
   audioEl = new Audio(s.audioSrc);
   audioEl.preload = 'auto';
@@ -1154,6 +1183,8 @@ nextBtn.addEventListener('click', ()=>{
 });
 
 function showPasswordScreen(){
+  stepPhase = 'password';
+  saveProgress();
   passwordError.style.display = 'none';
   passwordInput.value = '';
   passwordScreen.style.display = 'flex';
@@ -1166,6 +1197,8 @@ function checkPassword(){
   if(val && val === expected){
     passwordScreen.style.display = 'none';
     letterStage = 2;
+    stepPhase = 'letter2Prompt';
+    saveProgress();
     arrivalLetterPrompt.style.display = 'flex';
     playSuccessSound();
   } else {
@@ -1175,6 +1208,35 @@ function checkPassword(){
 }
 passwordSubmitBtn.addEventListener('click', checkPassword);
 passwordInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') checkPassword(); });
+
+// ---- keeping the screen awake ----
+// The Screen Wake Lock API stops the phone from auto-locking while this
+// tab is open and visible, which is the most common reason tracking
+// appears to "stop working" mid-hunt — the screen times out, the OS
+// suspends the page, and GPS/compass updates stop arriving.
+// Important limits, since this can't be fully worked around from a web
+// page: the lock is automatically released by the browser the moment the
+// tab is backgrounded or the phone is manually locked, and there is no
+// way for a plain web page to keep running GPS/audio/vibration reliably
+// once that happens — that requires either staying on this tab with the
+// screen on, or a native app with background location permission. Not
+// supported in every browser either, so this fails silently if absent.
+async function requestWakeLock(){
+  try{
+    if('wakeLock' in navigator){
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', ()=>{ wakeLock = null; });
+    }
+  }catch(e){ /* not supported, denied, or low battery mode — nothing we can do */ }
+}
+function releaseWakeLock(){
+  if(wakeLock){ wakeLock.release().catch(()=>{}); wakeLock = null; }
+}
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState === 'visible' && journeyActive && wakeLock === null){
+    requestWakeLock();
+  }
+});
 
 // ---- geolocation ----
 function startGeolocation(){
@@ -1309,6 +1371,8 @@ async function requestPermissionsAndStart(){
   attachOrientation();
   startSmoothingLoop();
   startGeolocation();
+  requestWakeLock();
+  journeyActive = true;
   gate.style.display = 'none';
   loadStop(current);
 }
@@ -1323,6 +1387,11 @@ startBtn.addEventListener('click', requestPermissionsAndStart);
 let introAudioEl = null;
 
 function setupIntroAudio(){
+  if(introAudioEl){
+    introAudioEl.pause();
+    introAudioEl.ontimeupdate = null;
+    introAudioEl.onended = null;
+  }
   introAudioEl = new Audio('audio/intro.mp3');
   introAudioEl.ontimeupdate = ()=>{
     if(introAudioEl.duration){
@@ -1352,12 +1421,21 @@ bottleBtn.addEventListener('click', ()=>{
   bottleBtn.disabled = true;
   introScreen.style.display = 'none';
   letterScreen.style.display = '';
+  introLetterTextWrap.scrollTop = 0;
   try{ setupIntroAudio(); }catch(e){} // missing/blocked intro.mp3 shouldn't stop the letter from showing
 });
 
-resumeBtn.addEventListener('click', ()=>{
+resumeBtn.addEventListener('click', async ()=>{
   resumeScreen.style.display = 'none';
-  requestPermissionsAndStart();
+  await requestPermissionsAndStart();
+  // requestPermissionsAndStart -> loadStop() always resets to the stop's
+  // very first phase ("arriving") — if we're resuming mid-stop, jump
+  // straight to where we actually left off instead of one phase early.
+  if(resumeStepPhase && resumeStepPhase !== 'arriving'){
+    renderPhase(resumeStepPhase);
+    saveProgress();
+  }
+  resumeStepPhase = null;
 });
 
 beginBtn.addEventListener('click', ()=>{
@@ -1375,6 +1453,11 @@ beginBtn.addEventListener('click', ()=>{
 // the original bottle letter.
 let reviewAudioEl = null;
 function setupReviewAudio(src){
+  if(reviewAudioEl){
+    reviewAudioEl.pause();
+    reviewAudioEl.ontimeupdate = null;
+    reviewAudioEl.onended = null;
+  }
   reviewPlayFill.style.width = '0%';
   reviewPlayHandle.style.left = '0%';
   reviewPlayBtn.textContent = '▶';
@@ -1408,12 +1491,14 @@ function showLetterReview(){
   if(lastLetter.type === 'stop'){
     const letter = lastLetter.stage === 2 ? STOPS[lastLetter.stopIndex].letter2 : STOPS[lastLetter.stopIndex].letter1;
     letterReviewText.textContent = letter.message;
+    letterReviewTextWrap.scrollTop = 0;
     setupReviewAudio(letter.audioSrc || '');
     letterReviewScreen.style.display = '';
   } else {
     beginBtn.style.display = 'none';
     closeLetterBtn.style.display = '';
     letterScreen.style.display = '';
+    introLetterTextWrap.scrollTop = 0;
   }
 }
 function hideLetterReview(){
@@ -1515,6 +1600,7 @@ function renderPhase(phase){
     lastLetter = { type: 'stop', stopIndex: current, stage: letterStage };
     const letter = letterStage === 1 ? STOPS[current].letter1 : STOPS[current].letter2;
     arrivalMsg.textContent = letter.message;
+    arrivalMsg.scrollTop = 0;
     playFill.style.width = '0%';
     playHandle.style.left = '0%';
     playBtn.textContent = '▶';
@@ -1591,6 +1677,7 @@ el('resetJourneyBtn').addEventListener('click', ()=>{
   if(saved){
     current = saved.current;
     lastLetter = saved.lastLetter;
+    resumeStepPhase = saved.stepPhase;
     introScreen.style.display = 'none';
     resumeScreen.style.display = '';
   }
