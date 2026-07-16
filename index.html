@@ -282,6 +282,22 @@
     margin-top:6px;
     min-height:16px;
   }
+  .proximity-hint{
+    font-family:var(--serif);
+    font-size:13px;
+    font-weight:700;
+    margin-top:4px;
+    min-height:16px;
+  }
+  .proximity-hint.warmer{ color:var(--wax-dark); }
+  .proximity-hint.colder{ color:var(--verdigris); }
+  .distance.close{
+    animation: warmPulse 1.6s ease-in-out infinite;
+  }
+  @keyframes warmPulse{
+    0%,100%{ opacity:1; }
+    50%{ opacity:0.55; }
+  }
 
   /* ---- start / permission gate ---- */
   .gate{
@@ -587,6 +603,7 @@ Bei einem Spiel aus Schlag und Ball und Loch, lernte ich die hiesigen Gebräuche
   <div class="readout" style="display:none;">
     <div class="distance" id="distanceOut">— <small>m</small></div>
     <div class="hint" id="hintOut">Ich suche dich…</div>
+    <div class="proximity-hint" id="proximityHint" style="display:none;"></div>
   </div>
 
   <button class="letter-icon-btn" id="reopenLetterBtn" aria-label="Brief erneut öffnen" style="display:none;">
@@ -828,15 +845,14 @@ In der Ferne hörte ich ein dumpfes Grummeln. So, als würde sich die Erde unter
     lng: 6.940703365241949,
     radius: 20,
     letter1: {
-      audioSrc: "audio/stop4-1.mp3",
-      message: "Es ist Zeit zu Essen, meine Lieben."
+      audioSrc: "audio/ending.mp3",
+      message: 'Dieser Ort hat mich etwas gelehrt. Das Leben ist eine Reise, also will ich Leben. Ich weiß nicht, ob ich jemals herausfinden werde, wo ich einst herkam, doch genauso wenig weiß ich heute, wo das Leben mich hintreiben wird. Also gehe ich voran, weiter den Fluss des Rheins entlang. Und so trennen sich nun unsere Wege, meine treuen Freundinnen und Freunde. Auch wenn wir uns nie begegneten, so fühle ich mich doch mit euch verbunden. Denn wir waren zusammen auf dieser Reise - nur die Zeit war eine andere. Für mich geht es nun weiter. Vielleicht treffen wir uns ja irgendwann. Dann können wir gemeinsam neue Abenteuer in dieser einzigartigen Stadt erleben. Nun feiert. Freut euch. Lebt euer Leben. Und Montag geht es gefälligst wieder an die Arbeit, ihr faulen Hunde. Mit unbezahlten Überstunden und Krankenschein am ersten Tag. Gehabt euch wohl. Euer Freund. Hieronymus Püdelheim'
     }
   }
-
 ];
 /* ============================================================ */
 
-const APP_VERSION = "1.18.0";
+const APP_VERSION = "1.19.0";
 
 let current = 0;
 let rawPos = null;       // {lat, lng} straight from the GPS
@@ -854,6 +870,7 @@ let stepPhase = 'arriving'; // tracks where we are within the current stop (arri
 let resumeStepPhase = null; // set only when restoring saved progress — the phase to jump to right after startup
 let wakeLock = null;
 let journeyActive = false; // true once the trail has actually started — gates the wake-lock re-acquire below
+let lastDist = null; // previous distance reading, for the getting-warmer/colder trend
 let lastLetter = { type: 'intro' }; // or { type:'stop', stopIndex:N, stage:1|2 } — what "reopen the letter" should show
 
 const el = id => document.getElementById(id);
@@ -884,6 +901,7 @@ const stopNameEl = el('stopName');
 const stopCountEl = el('stopCount');
 const distanceOut = el('distanceOut');
 const hintOut = el('hintOut');
+const proximityHint = el('proximityHint');
 const needle = el('needle');
 const gate = el('gate');
 const startBtn = el('startBtn');
@@ -1011,6 +1029,8 @@ function loadStop(i){
   arrived = false;
   letterStage = 1;
   stepPhase = 'arriving';
+  lastDist = null;
+  proximityHint.style.display = 'none';
   arrivalPanel.classList.remove('show');
   arrivalLetterPrompt.style.display = 'none';
   document.querySelector('.status').style.display = '';
@@ -1061,6 +1081,33 @@ function updateDial(){
     hintOut.textContent = dist <= target.radius ? '' : 'Folge meiner Spur.';
   } else {
     hintOut.textContent = 'Lege dein Telefon flach hin, um es zu kalibrieren.';
+  }
+
+  // "Getting warmer/colder": near the target, GPS noise makes the compass
+  // bearing shaky, but whether consecutive distance readings are shrinking
+  // or growing is a much steadier signal since it doesn't depend on heading
+  // at all. Kicks in only within a close range so it doesn't add noise
+  // while still far away, where the compass alone is reliable.
+  const closeRange = Math.max(target.radius * 3, target.radius + 20);
+  distanceOut.classList.toggle('close', dist <= target.radius * 1.5);
+  if(dist <= closeRange && dist > target.radius){
+    if(lastDist !== null){
+      const delta = dist - lastDist;
+      if(delta < -1){
+        proximityHint.textContent = '🔥 Wärmer';
+        proximityHint.className = 'proximity-hint warmer';
+        proximityHint.style.display = '';
+      } else if(delta > 1){
+        proximityHint.textContent = '❄️ Kälter';
+        proximityHint.className = 'proximity-hint colder';
+        proximityHint.style.display = '';
+      }
+      // small deltas: leave whatever was showing rather than flicker on GPS noise
+    }
+    lastDist = dist;
+  } else {
+    proximityHint.style.display = 'none';
+    lastDist = null;
   }
 
   if(!arrived && dist <= target.radius){
@@ -1286,13 +1333,20 @@ function startGeolocation(){
     return;
   }
   watchId = navigator.geolocation.watchPosition(pos=>{
+    const acc = pos.coords.accuracy;
+    if(acc && acc > 50){
+      // a fix this imprecise is more likely to mislead than help — skip it
+      // and wait for the next one rather than dragging the average toward it
+      return;
+    }
     rawPos = {lat: pos.coords.latitude, lng: pos.coords.longitude};
     if(userPos === null){
       userPos = {...rawPos};
     } else {
       // light exponential smoothing — GPS jitter of a few meters causes big
-      // bearing swings when close to a target, this settles it down
-      const posAlpha = 0.35;
+      // bearing swings when close to a target, this settles it down.
+      // Trust unusually precise fixes a bit more than average ones.
+      const posAlpha = (acc && acc < 12) ? 0.5 : 0.35;
       userPos = {
         lat: userPos.lat + (rawPos.lat - userPos.lat) * posAlpha,
         lng: userPos.lng + (rawPos.lng - userPos.lng) * posAlpha
