@@ -539,6 +539,7 @@
       </svg>
     </button>
     <p class="intro-hint">Tippe auf die Flasche</p>
+    <button class="ghost" id="storyModeBtn" style="max-width:220px;">Story Mode</button>
   </div>
 
   <div class="intro" id="resumeScreen" style="display:none;">
@@ -653,6 +654,26 @@ Wer auch immer diese Nachricht erhält - folgt auf meinen Spuren und findet mein
       </div>
     </div>
     <button class="ghost" id="closeReviewBtn">Zurück zum Kompass</button>
+  </div>
+
+  <div class="letter-screen" id="storyScreen" style="display:none;">
+    <div class="letter-text" id="storyTextWrap">
+      <p id="storyText"></p>
+    </div>
+    <div class="play-row">
+      <button class="play-btn" id="storyPlayBtn">▶</button>
+      <div class="play-track" id="storyPlayTrack">
+        <div class="line">
+          <div class="fill" id="storyPlayFill"></div>
+          <div class="handle" id="storyPlayHandle"></div>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex; gap:8px; margin-top:10px;">
+      <button class="ghost" id="storyPrevBtn" style="flex:1;">◀ Zurück</button>
+      <button class="primary" id="storyNextBtn" style="flex:1;">Weiter ▶</button>
+    </div>
+    <button class="ghost" id="endStoryModeBtn" style="margin-top:10px;">Story Mode beenden</button>
   </div>
 
   <div class="arrival" id="arrivalPanel">
@@ -842,7 +863,7 @@ In der Ferne hörte ich ein dumpfes Grummeln. So, als würde sich die Erde unter
 ];
 /* ============================================================ */
 
-const APP_VERSION = "1.20.0";
+const APP_VERSION = "1.21.0";
 
 let current = 0;
 let rawPos = null;       // {lat, lng} straight from the GPS
@@ -883,6 +904,17 @@ const letterReviewText = el('letterReviewText');
 const letterReviewTextWrap = el('letterReviewTextWrap');
 const introLetterTextWrap = el('introLetterTextWrap');
 const closeReviewBtn = el('closeReviewBtn');
+const storyModeBtn = el('storyModeBtn');
+const storyScreen = el('storyScreen');
+const storyText = el('storyText');
+const storyTextWrap = el('storyTextWrap');
+const storyPlayBtn = el('storyPlayBtn');
+const storyPlayFill = el('storyPlayFill');
+const storyPlayTrack = el('storyPlayTrack');
+const storyPlayHandle = el('storyPlayHandle');
+const storyPrevBtn = el('storyPrevBtn');
+const storyNextBtn = el('storyNextBtn');
+const endStoryModeBtn = el('endStoryModeBtn');
 const reviewPlayBtn = el('reviewPlayBtn');
 const reviewPlayFill = el('reviewPlayFill');
 const reviewPlayTrack = el('reviewPlayTrack');
@@ -1567,6 +1599,101 @@ reviewPlayBtn.addEventListener('click', ()=>{
   }
 });
 setupSeekableTrack(reviewPlayTrack, reviewPlayHandle, reviewPlayFill, ()=>reviewAudioEl);
+
+// ---- Story Mode: browse every letter with audio, no GPS/compass needed ----
+// Keeps the same text as the hardcoded intro letter above, just as a plain
+// string so it can be shown here too. If you edit the intro letter,
+// update this to match.
+const INTRO_LETTER_TEXT = `Wer auch immer diese Nachricht erhält. Ich brauche eure Hilfe. Mein Name ist Hieronymus Püdelheim. Ich lief Bruch auf den Weiten des Rheins. 19 Sonnen und 19 Monde trieb ich führungslos umher, bis ich endlich auf Land stieß. Oh, ich gebeutelte Seele. Sollte ich doch kein grausiges Ende auf See finden? Nein. Dort wo wochenlang nur nasses Holz und seichte Gischt meine nackten Füsse küsste, dort wärmte sie nun Mutter Erde.
+Sand, Schlamm, Kies, saftiges Gras und sogar warmer Asphalt. Ich war gerettet. Doch ich hatte alles verloren. Nicht nur Prunk und Flodder. Auch die Gallerie meiner Vergangenheit war aus meiner Hirnrinde gestrichen. Hieronymus. Das war mein Name. Alles andere war vernebelt. Dieser Ort. der als Hodenkirchen an mein Gehör trat, stellte sich als beschaulich heraus.
+
+Ich armer Tor irrte umher auf der Suche nach mir selbst. Was der Hodenkirchener Adel zu seien schien, bot mir seine Hilfe an. Sie luden mich ein, tiefer in ihre Gefielde. Sie sprachen von einer Art Spiel, mit dem sie mich in ihre Reihen aufnehmen würden.
+Also machte ich mich auf den Weg. Weiter gen Süden, am Flussufer entlang.
+Dieser elendige Fluss, der mich von Haus und Hof und meiner selbst trennte.
+Wer auch immer diese Nachricht erhält - folgt auf meinen Spuren und findet meinen Weg.
+
+Hochachtungsvoll,
+— Hieronymus Püdelheim`;
+
+function buildStoryItems(){
+  const items = [{ audioSrc: 'audio/intro.mp3', message: INTRO_LETTER_TEXT }];
+  STOPS.forEach(s=>{
+    items.push(s.letter1);
+    if(s.letter2 && s.letter2.message) items.push(s.letter2);
+  });
+  return items;
+}
+const STORY_ITEMS = buildStoryItems();
+
+let storyIndex = 0;
+let storyAudioEl = null;
+
+function setupStoryAudio(src){
+  if(storyAudioEl){
+    storyAudioEl.pause();
+    storyAudioEl.ontimeupdate = null;
+    storyAudioEl.onended = null;
+  }
+  storyPlayFill.style.width = '0%';
+  storyPlayHandle.style.left = '0%';
+  storyPlayBtn.textContent = '▶';
+  if(!src){ storyAudioEl = null; return; }
+  storyAudioEl = new Audio(src);
+  storyAudioEl.ontimeupdate = ()=>{
+    if(storyAudioEl.duration){
+      const pct = (storyAudioEl.currentTime/storyAudioEl.duration)*100;
+      storyPlayFill.style.width = `${pct}%`;
+      storyPlayHandle.style.left = `${pct}%`;
+    }
+  };
+  storyAudioEl.onended = ()=>{ storyPlayBtn.textContent='▶'; storyPlayFill.style.width='100%'; storyPlayHandle.style.left='100%'; };
+  const p = storyAudioEl.play(); // advancing is always a direct tap, so autoplay is allowed
+  if(p && typeof p.then === 'function'){
+    p.then(()=>{ storyPlayBtn.textContent='❚❚'; }).catch(()=>{ storyPlayBtn.textContent='▶'; });
+  }
+}
+
+function showStoryItem(i){
+  storyIndex = i;
+  const item = STORY_ITEMS[i];
+  storyText.textContent = item.message;
+  storyTextWrap.scrollTop = 0;
+  setupStoryAudio(item.audioSrc || '');
+  storyPrevBtn.disabled = (i === 0);
+  storyPrevBtn.style.opacity = storyPrevBtn.disabled ? '0.4' : '1';
+  storyNextBtn.textContent = (i === STORY_ITEMS.length - 1) ? 'Von vorne beginnen' : 'Weiter ▶';
+}
+
+storyPlayBtn.addEventListener('click', ()=>{
+  if(!storyAudioEl) return;
+  if(storyAudioEl.paused){
+    storyAudioEl.play().then(()=>{ storyPlayBtn.textContent='❚❚'; }).catch(()=>{});
+  } else {
+    storyAudioEl.pause();
+    storyPlayBtn.textContent='▶';
+  }
+});
+setupSeekableTrack(storyPlayTrack, storyPlayHandle, storyPlayFill, ()=>storyAudioEl);
+
+storyNextBtn.addEventListener('click', ()=>{
+  // at the last letter, "Weiter" turns into a restart instead of stopping dead
+  showStoryItem(storyIndex >= STORY_ITEMS.length - 1 ? 0 : storyIndex + 1);
+});
+storyPrevBtn.addEventListener('click', ()=>{
+  if(storyIndex > 0) showStoryItem(storyIndex - 1);
+});
+
+storyModeBtn.addEventListener('click', ()=>{
+  introScreen.style.display = 'none';
+  storyScreen.style.display = '';
+  showStoryItem(0);
+});
+
+endStoryModeBtn.addEventListener('click', ()=>{
+  if(storyAudioEl){ storyAudioEl.pause(); }
+  storyScreen.style.display = 'none';
+  introScreen.style.display = '';
+});
 
 function showLetterReview(){
   document.querySelector('.status').style.display = 'none';
